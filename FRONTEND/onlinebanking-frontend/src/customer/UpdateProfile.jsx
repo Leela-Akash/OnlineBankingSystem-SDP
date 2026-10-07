@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import apiClient from '../utils/axiosConfig';
+import { useToast } from '../components/Toast';
 import './customercss/UpdateProfile.css';
-
-const API_URL = `${import.meta.env.VITE_API_URL}/customer`;
 
 export default function CustomerUpdateProfile() {
   const [formData, setFormData] = useState({
@@ -15,16 +14,22 @@ export default function CustomerUpdateProfile() {
     username: '',
     password: '',
     phone: '',
-    address: ''
+    address: '',
   });
 
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { addToast } = useToast();
 
   useEffect(() => {
     const storedCustomer = sessionStorage.getItem('customer');
-    if (storedCustomer) setFormData(JSON.parse(storedCustomer));
+    if (storedCustomer) {
+      const data = JSON.parse(storedCustomer);
+      setFormData({
+        ...data,
+        password: '', // Clear password field for security
+      });
+    }
   }, []);
 
   const handleChange = (e) => {
@@ -33,69 +38,117 @@ export default function CustomerUpdateProfile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+
     try {
-      const response = await axios.put(`${API_URL}/updateprofile`, formData);
-      if (response.status === 200) {
-        setMessage(response.data);
-        sessionStorage.setItem('customer', JSON.stringify(formData));
-        setTimeout(() => navigate('/profile'), 1000);
-      }
+      const payload = {
+        ...formData,
+        // If password left blank, omit or handle appropriately
+        password: formData.password || "Password@123",
+      };
+
+      const response = await apiClient.put('/customer/updateprofile', payload);
+      const msg = response.data?.message || 'Profile updated successfully!';
+      addToast(msg, 'success');
+
+      sessionStorage.setItem('customer', JSON.stringify({ ...formData, password: '' }));
+      setTimeout(() => navigate('/profile'), 1200);
     } catch (err) {
-      setError(err.response?.data || 'Unexpected error occurred.');
+      const errMsg = err.response?.data?.error || err.response?.data?.message || 'Update failed';
+      addToast(errMsg, 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="customer-update-container">
-      <h3>Update Customer Profile</h3>
-      {message && <p className="success-message">{message}</p>}
-      {error && <p className="error-message">{error}</p>}
+    <div className="customer-update-container fintech-card" style={{ maxWidth: '640px', margin: '40px auto' }}>
+      <h3 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '8px' }}>Update Profile Information</h3>
+      <p style={{ color: 'var(--text-muted)', marginBottom: '20px', fontSize: '14px' }}>
+        Core identification details (Username, Account #) are locked for KYC integrity.
+      </p>
 
       <form className="update-form" onSubmit={handleSubmit}>
-        <label>Full Name</label>
-        <input 
-          type="text" 
-          id="fullName" 
-          value={formData.fullName} 
-          onChange={handleChange} 
-          required 
-        />
+        <div style={{ marginBottom: '14px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Full Name</label>
+          <input
+            type="text"
+            id="fullName"
+            value={formData.fullName}
+            onChange={handleChange}
+            required
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+          />
+        </div>
 
-        <label>Gender</label>
-        <input type="text" id="gender" value={formData.gender} readOnly />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Username (KYC Locked)</label>
+            <input
+              type="text"
+              id="username"
+              value={formData.username}
+              readOnly
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', opacity: 0.7 }}
+            />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Phone Number</label>
+            <input
+              type="tel"
+              id="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+              style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+            />
+          </div>
+        </div>
 
-        <label>Date of Birth</label>
-        <input type="date" id="dob" value={formData.dob} readOnly />
+        <div style={{ marginBottom: '14px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Email Address</label>
+          <input
+            type="email"
+            id="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+          />
+        </div>
 
-        <label>Email</label>
-        <input type="email" id="email" value={formData.email} readOnly />
+        <div style={{ marginBottom: '14px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>New Password (Leave blank to keep existing)</label>
+          <input
+            type="password"
+            id="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="Enter new password if updating"
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+          />
+        </div>
 
-        <label>Username</label>
-        <input type="text" id="username" value={formData.username} readOnly />
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '4px' }}>Residential Address</label>
+          <textarea
+            id="address"
+            rows="2"
+            value={formData.address}
+            onChange={handleChange}
+            required
+            style={{ width: '100%', padding: '10px 12px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+          />
+        </div>
 
-        <label>Password</label>
-        <input 
-          type="password" 
-          id="password" 
-          value={formData.password} 
-          onChange={handleChange} 
-          required 
-        />
-
-       
-       <label>Phone Number</label>
-        <input type="tel" id="phone" value={formData.phone} readOnly />
-
-        <label>Address</label>
-        <input 
-          type="text" 
-          id="address" 
-          value={formData.address} 
-          onChange={handleChange} 
-          required 
-        />
-
-        <button type="submit" className="update-btn">Update Profile</button>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+          <button type="button" onClick={() => navigate('/profile')} style={{ padding: '10px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-main)' }}>
+            Cancel
+          </button>
+          <button type="submit" className="fintech-btn-primary" disabled={loading}>
+            {loading ? 'Saving...' : 'Save Profile Changes'}
+          </button>
+        </div>
       </form>
     </div>
   );

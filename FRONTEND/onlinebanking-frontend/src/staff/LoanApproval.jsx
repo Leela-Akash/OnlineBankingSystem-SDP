@@ -1,220 +1,239 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState, useCallback } from 'react';
+import apiClient from '../utils/axiosConfig';
+import { useToast } from '../components/Toast';
+import { useVisibilityPolling } from '../utils/useVisibilityPolling';
+import Skeleton from '../components/Skeleton';
 import './staffcss/LoanApproval.css';
-
-const API_URL = `${import.meta.env.VITE_API_URL}/loan`;
 
 export default function LoanApproval() {
   const [pendingLoans, setPendingLoans] = useState([]);
   const [allLoans, setAllLoans] = useState([]);
   const [activeTab, setActiveTab] = useState('pending');
-  const [loading, setLoading] = useState(false);
-  const [actionStatus, setActionStatus] = useState({ show: false, message: '', type: '' });
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState(null);
+  const { addToast } = useToast();
+
+  const fetchLoans = useCallback(async () => {
+    try {
+      const [pendingRes, allRes] = await Promise.all([
+        apiClient.get('/loan/pending'),
+        apiClient.get('/loan/all'),
+      ]);
+      setPendingLoans(pendingRes.data || []);
+      setAllLoans(allRes.data || []);
+    } catch (error) {
+      console.error('Error fetching loans:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchLoans();
-  }, []);
+  }, [fetchLoans]);
 
-  const fetchLoans = async () => {
-    try {
-      const [pendingRes, allRes] = await Promise.all([
-        axios.get(`${API_URL}/pending`),
-        axios.get(`${API_URL}/all`)
-      ]);
-      setPendingLoans(pendingRes.data);
-      setAllLoans(allRes.data);
-    } catch (error) {
-      console.error('Error fetching loans:', error);
-    }
-  };
+  useVisibilityPolling(fetchLoans, 30000);
 
   const handleApprove = async (loanId) => {
-    if (!window.confirm('Are you sure you want to approve this loan?')) return;
-
+    setProcessingId(loanId);
     try {
-      setLoading(true);
-      await axios.put(`${API_URL}/approve/${loanId}`, {
-        comments: 'Loan approved by staff'
+      await apiClient.put(`/loan/approve/${loanId}`, {
+        comments: 'Credit terms verified & approved by Branch Staff',
       });
-      showStatus('success', 'Loan approved successfully!');
+      addToast('Loan application approved successfully!', 'success');
       fetchLoans();
     } catch (error) {
-      showStatus('error', error.response?.data?.error || 'Failed to approve loan');
+      addToast(error.response?.data?.error || 'Failed to approve loan', 'error');
     } finally {
-      setLoading(false);
+      setProcessingId(null);
     }
   };
 
   const handleReject = async (loanId) => {
-    const reason = window.prompt('Please enter rejection reason:');
+    const reason = window.prompt('Specify underwriting rejection reason:', 'Credit score threshold not met');
     if (!reason) return;
 
+    setProcessingId(loanId);
     try {
-      setLoading(true);
-      await axios.put(`${API_URL}/reject/${loanId}`, {
-        comments: reason
+      await apiClient.put(`/loan/reject/${loanId}`, {
+        comments: reason,
       });
-      showStatus('success', 'Loan rejected');
+      addToast('Loan application rejected', 'info');
       fetchLoans();
     } catch (error) {
-      showStatus('error', error.response?.data?.error || 'Failed to reject loan');
+      addToast(error.response?.data?.error || 'Failed to reject loan', 'error');
     } finally {
-      setLoading(false);
+      setProcessingId(null);
     }
   };
 
   const handleDisburse = async (loanId) => {
-    if (!window.confirm('Disburse loan amount to customer account?')) return;
-
+    setProcessingId(loanId);
     try {
-      setLoading(true);
-      await axios.put(`${API_URL}/disburse/${loanId}`);
-      showStatus('success', 'Loan disbursed successfully! Amount credited to customer account.');
+      await apiClient.put(`/loan/disburse/${loanId}`);
+      addToast('Loan capital disbursed directly into customer ledger balance!', 'success');
       fetchLoans();
     } catch (error) {
-      showStatus('error', error.response?.data?.error || 'Failed to disburse loan');
+      addToast(error.response?.data?.error || 'Failed to disburse loan funds', 'error');
     } finally {
-      setLoading(false);
+      setProcessingId(null);
     }
   };
 
-  const showStatus = (type, message) => {
-    setActionStatus({ show: true, type, message });
-    setTimeout(() => setActionStatus({ show: false, message: '', type: '' }), 4000);
+  const getStatusBadge = (status) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'approved' || s === 'disbursed') return <span className="badge-active">{status}</span>;
+    if (s === 'rejected') return <span className="badge-inactive">{status}</span>;
+    return <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '9999px', fontSize: '12px', fontWeight: 600 }}>{status}</span>;
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      'Pending': '#ff9800',
-      'Approved': '#4caf50',
-      'Rejected': '#f44336',
-      'Active': '#2196f3',
-      'Completed': '#9e9e9e'
-    };
-    return colors[status] || '#666';
-  };
+  if (loading) {
+    return (
+      <div style={{ maxWidth: '1100px', margin: '30px auto' }}>
+        <Skeleton height="40px" width="300px" />
+        <Skeleton height="200px" style={{ marginTop: '20px' }} />
+      </div>
+    );
+  }
 
-  const loansToDisplay = activeTab === 'pending' ? pendingLoans : allLoans;
+  const displayedLoans = activeTab === 'pending' ? pendingLoans : allLoans;
 
   return (
-    <div className="loan-approval-container">
-      <div className="loan-approval-header">
-        <h2>🔍 Loan Management</h2>
-        <div className="tabs">
+    <div className="loan-approval-container" style={{ maxWidth: '1100px', margin: '20px auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h2 style={{ fontSize: '26px', fontWeight: 700 }}>📋 Loan Underwriting & Disbursement</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+            Underwrite pending loan applications or disburse capital to borrowers
+          </p>
+        </div>
+
+        {/* Tab Controls */}
+        <div style={{ display: 'flex', gap: '8px' }}>
           <button
-            className={activeTab === 'pending' ? 'active' : ''}
             onClick={() => setActiveTab('pending')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-color)',
+              backgroundColor: activeTab === 'pending' ? 'var(--primary)' : 'var(--bg-card)',
+              color: activeTab === 'pending' ? '#fff' : 'var(--text-main)',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
           >
-            Pending ({pendingLoans.length})
+            Pending Review ({pendingLoans.length})
           </button>
           <button
-            className={activeTab === 'all' ? 'active' : ''}
             onClick={() => setActiveTab('all')}
+            style={{
+              padding: '8px 16px',
+              borderRadius: '6px',
+              border: '1px solid var(--border-color)',
+              backgroundColor: activeTab === 'all' ? 'var(--primary)' : 'var(--bg-card)',
+              color: activeTab === 'all' ? '#fff' : 'var(--text-main)',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
           >
             All Loans ({allLoans.length})
           </button>
         </div>
       </div>
 
-      {actionStatus.show && (
-        <div className={`status-message ${actionStatus.type}`}>
-          {actionStatus.type === 'success' ? '✓' : '✗'} {actionStatus.message}
-        </div>
-      )}
+      <div className="fintech-card">
+        {displayedLoans.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            No {activeTab === 'pending' ? 'pending' : ''} loans found.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '12px 8px' }}>ID</th>
+                  <th style={{ padding: '12px 8px' }}>Borrower</th>
+                  <th style={{ padding: '12px 8px' }}>Type</th>
+                  <th style={{ padding: '12px 8px' }}>Principal</th>
+                  <th style={{ padding: '12px 8px' }}>Tenure</th>
+                  <th style={{ padding: '12px 8px' }}>Status</th>
+                  <th style={{ padding: '12px 8px', textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedLoans.map((loan) => (
+                  <tr key={loan.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '12px 8px', fontFamily: 'monospace' }}>#{loan.id}</td>
+                    <td style={{ padding: '12px 8px' }}>
+                      <div style={{ fontWeight: 600 }}>{loan.customer?.fullName || 'Customer #' + (loan.customer?.id || 'N/A')}</div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                        Acc #{loan.customer?.accountNumber || 'Pending'}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 8px' }}>{loan.loanType}</td>
+                    <td style={{ padding: '12px 8px', fontWeight: 700, color: 'var(--primary)' }}>
+                      ₹{Number(loan.loanAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: '12px 8px' }}>{loan.tenureMonths} mos</td>
+                    <td style={{ padding: '12px 8px' }}>{getStatusBadge(loan.status)}</td>
+                    <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        {loan.status?.toLowerCase() === 'pending' && (
+                          <>
+                            <button
+                              onClick={() => handleApprove(loan.id)}
+                              disabled={processingId === loan.id}
+                              style={{
+                                backgroundColor: 'var(--success)',
+                                color: '#fff',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReject(loan.id)}
+                              disabled={processingId === loan.id}
+                              style={{
+                                backgroundColor: 'var(--danger)',
+                                color: '#fff',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                border: 'none',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
 
-      {loading && (
-        <div className="loading-overlay">
-          <div className="spinner"></div>
-          Processing...
-        </div>
-      )}
-
-      {pendingLoans.length === 0 && activeTab === 'pending' ? (
-        <div className="no-loans">
-          <p>No pending loan requests</p>
-        </div>
-      ) : (
-        <div className="loans-grid">
-          {loansToDisplay.map(loan => (
-            <div key={loan.id} className="loan-card">
-              <div className="loan-header-section">
-                <div>
-                  <h3>{loan.loanType}</h3>
-                  <p className="customer-name">
-                    {loan.customer?.fullName} (ID: {loan.customer?.id})
-                  </p>
-                </div>
-                <span
-                  className="status-badge"
-                  style={{ backgroundColor: getStatusColor(loan.status) }}
-                >
-                  {loan.status}
-                </span>
-              </div>
-
-              <div className="loan-details-grid">
-                <div className="detail-item">
-                  <span className="label">Amount</span>
-                  <span className="value">₹{loan.loanAmount?.toLocaleString()}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="label">Interest Rate</span>
-                  <span className="value">{loan.interestRate}% APR</span>
-                </div>
-                <div className="detail-item">
-                  <span className="label">Tenure</span>
-                  <span className="value">{loan.tenureMonths} months</span>
-                </div>
-                <div className="detail-item">
-                  <span className="label">Purpose</span>
-                  <span className="value">{loan.purpose}</span>
-                </div>
-                <div className="detail-item">
-                  <span className="label">Request Date</span>
-                  <span className="value">{new Date(loan.requestDate).toLocaleDateString()}</span>
-                </div>
-              </div>
-
-              {loan.comments && (
-                <div className="comments-section">
-                  <strong>Comments:</strong> {loan.comments}
-                </div>
-              )}
-
-              {loan.status === 'Pending' && (
-                <div className="action-buttons">
-                  <button
-                    className="approve-btn"
-                    onClick={() => handleApprove(loan.id)}
-                    disabled={loading}
-                  >
-                    ✓ Approve
-                  </button>
-                  <button
-                    className="reject-btn"
-                    onClick={() => handleReject(loan.id)}
-                    disabled={loading}
-                  >
-                    ✗ Reject
-                  </button>
-                </div>
-              )}
-
-              {loan.status === 'Approved' && (
-                <div className="action-buttons">
-                  <button
-                    className="disburse-btn"
-                    onClick={() => handleDisburse(loan.id)}
-                    disabled={loading}
-                  >
-                    💰 Disburse Loan
-                  </button>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+                        {loan.status?.toLowerCase() === 'approved' && (
+                          <button
+                            onClick={() => handleDisburse(loan.id)}
+                            disabled={processingId === loan.id}
+                            className="fintech-btn-primary"
+                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                          >
+                            💸 Disburse Funds
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

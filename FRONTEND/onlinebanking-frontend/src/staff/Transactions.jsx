@@ -1,75 +1,62 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import apiClient from "../utils/axiosConfig";
-import { useToast } from "../components/Toast";
+import { useVisibilityPolling } from "../utils/useVisibilityPolling";
 import Skeleton from "../components/Skeleton";
-import "./admincss/AllTransactions.css";
+import { useToast } from "../components/Toast";
+import "./staffcss/Transactions.css";
 
-export default function AllTransactions() {
+export default function Transactions() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState("ALL");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-
   const { addToast } = useToast();
 
   const fetchTransactions = useCallback(async () => {
     try {
-      setLoading(true);
       const res = await apiClient.get("/transaction/all");
       setTransactions(Array.isArray(res.data) ? res.data : res.data?.content || []);
     } catch (err) {
-      addToast("Failed to fetch all transactions", "error");
+      console.error("Failed to fetch transactions:", err);
     } finally {
       setLoading(false);
     }
-  }, [addToast]);
+  }, []);
 
   useEffect(() => {
     fetchTransactions();
   }, [fetchTransactions]);
 
+  useVisibilityPolling(fetchTransactions, 45000);
+
   const filteredTransactions = useMemo(() => {
-    return transactions.filter((txn) => {
-      const q = searchTerm.toLowerCase();
+    return transactions.filter((tx) => {
+      const matchesType = typeFilter === "ALL" || tx.type?.toUpperCase() === typeFilter;
+      const desc = tx.description || "";
+      const custName = tx.customer?.fullName || "";
+      const ref = tx.referenceId || "";
       const matchesSearch =
-        txn.description?.toLowerCase().includes(q) ||
-        txn.customer?.fullName?.toLowerCase().includes(q) ||
-        txn.referenceId?.toLowerCase().includes(q);
-
-      const matchesType =
-        typeFilter === "ALL" || txn.type?.toUpperCase() === typeFilter;
-
-      let matchesDate = true;
-      if (startDate) {
-        matchesDate = matchesDate && new Date(txn.transactionDate) >= new Date(startDate);
-      }
-      if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        matchesDate = matchesDate && new Date(txn.transactionDate) <= end;
-      }
-
-      return matchesSearch && matchesType && matchesDate;
+        desc.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        custName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ref.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesType && matchesSearch;
     });
-  }, [transactions, searchTerm, typeFilter, startDate, endDate]);
+  }, [transactions, typeFilter, searchTerm]);
 
   const exportCSV = () => {
     if (filteredTransactions.length === 0) {
-      addToast("No transactions matching criteria to export", "warning");
+      addToast("No transactions to export", "warning");
       return;
     }
 
-    const headers = ["ID", "Reference ID", "Customer ID", "Customer Name", "Type", "Amount", "Balance After", "Description", "Date"];
+    const headers = ["ID", "Reference ID", "Customer", "Account #", "Type", "Amount", "Description", "Date"];
     const rows = filteredTransactions.map((tx) => [
       `"${tx.id}"`,
       `"${tx.referenceId || "N/A"}"`,
-      `"${tx.customer?.id || ""}"`,
-      `"${tx.customer?.fullName || ""}"`,
+      `"${tx.customer?.fullName || "N/A"}"`,
+      `"${tx.customer?.accountNumber || "N/A"}"`,
       `"${tx.type || ""}"`,
       `"${tx.amount || 0}"`,
-      `"${tx.balanceAfter || "N/A"}"`,
       `"${(tx.description || "").replace(/"/g, '""')}"`,
       `"${tx.transactionDate || ""}"`,
     ]);
@@ -78,17 +65,17 @@ export default function AllTransactions() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Admin_Transactions_Audit_${Date.now()}.csv`);
+    link.setAttribute("download", `Staff_Transactions_Audit_${Date.now()}.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();
 
-    addToast("Exported transactions CSV successfully", "success");
+    addToast("Exported transactions to CSV", "success");
   };
 
   if (loading) {
     return (
-      <div style={{ maxWidth: "1140px", margin: "30px auto" }}>
+      <div style={{ maxWidth: "1100px", margin: "30px auto" }}>
         <Skeleton height="40px" width="300px" />
         <Skeleton height="350px" style={{ marginTop: "20px" }} />
       </div>
@@ -96,12 +83,12 @@ export default function AllTransactions() {
   }
 
   return (
-    <div className="transactions-container fintech-card" style={{ maxWidth: "1140px", margin: "20px auto" }}>
+    <div className="transactions-container fintech-card" style={{ maxWidth: "1100px", margin: "20px auto" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
         <div>
           <h2 style={{ fontSize: "24px", fontWeight: 700 }}>System Transactions Ledger</h2>
           <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>
-            Comprehensive institutional audit trail of all customer credits, debits, and wire transfers
+            Real-time branch financial transactions monitoring & auditing
           </p>
         </div>
 
@@ -110,19 +97,22 @@ export default function AllTransactions() {
         </button>
       </div>
 
-      {/* Filter Toolbar */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", marginBottom: "20px" }}>
+      {/* Filters */}
+      <div style={{ display: "flex", gap: "12px", marginBottom: "20px", flexWrap: "wrap" }}>
         <input
           type="text"
-          placeholder="Search customer, ref, description..."
+          placeholder="Filter by customer, description, reference..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
-            padding: "8px 12px",
+            flex: 1,
+            minWidth: "240px",
+            padding: "10px 14px",
             borderRadius: "6px",
             border: "1px solid var(--border-color)",
             backgroundColor: "var(--bg-main)",
             color: "var(--text-main)",
+            fontSize: "14px",
           }}
         />
 
@@ -130,43 +120,18 @@ export default function AllTransactions() {
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
           style={{
-            padding: "8px 12px",
+            padding: "10px 14px",
             borderRadius: "6px",
             border: "1px solid var(--border-color)",
             backgroundColor: "var(--bg-main)",
             color: "var(--text-main)",
+            fontSize: "14px",
           }}
         >
-          <option value="ALL">All Types</option>
+          <option value="ALL">All Transaction Types</option>
           <option value="CREDIT">Credits (Deposits)</option>
-          <option value="DEBIT">Debits (Withdrawals)</option>
+          <option value="DEBIT">Debits (Withdrawals / Transfers)</option>
         </select>
-
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-          style={{
-            padding: "8px 12px",
-            borderRadius: "6px",
-            border: "1px solid var(--border-color)",
-            backgroundColor: "var(--bg-main)",
-            color: "var(--text-main)",
-          }}
-        />
-
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
-          style={{
-            padding: "8px 12px",
-            borderRadius: "6px",
-            border: "1px solid var(--border-color)",
-            backgroundColor: "var(--bg-main)",
-            color: "var(--text-main)",
-          }}
-        />
       </div>
 
       <div style={{ overflowX: "auto" }}>
@@ -174,18 +139,19 @@ export default function AllTransactions() {
           <thead>
             <tr style={{ borderBottom: "2px solid var(--border-color)", color: "var(--text-muted)" }}>
               <th style={{ padding: "12px 8px" }}>ID / Reference</th>
-              <th style={{ padding: "12px 8px" }}>Customer Name</th>
+              <th style={{ padding: "12px 8px" }}>Customer</th>
+              <th style={{ padding: "12px 8px" }}>Account #</th>
               <th style={{ padding: "12px 8px" }}>Type</th>
               <th style={{ padding: "12px 8px", textAlign: "right" }}>Amount</th>
               <th style={{ padding: "12px 8px" }}>Description</th>
-              <th style={{ padding: "12px 8px" }}>Date</th>
+              <th style={{ padding: "12px 8px" }}>Timestamp</th>
             </tr>
           </thead>
           <tbody>
             {filteredTransactions.length === 0 ? (
               <tr>
-                <td colSpan={6} style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)" }}>
-                  No matching transaction records found
+                <td colSpan={7} style={{ textAlign: "center", padding: "32px", color: "var(--text-muted)" }}>
+                  No matching transactions found
                 </td>
               </tr>
             ) : (
@@ -198,6 +164,9 @@ export default function AllTransactions() {
                     </td>
                     <td style={{ padding: "12px 8px", fontWeight: 600 }}>
                       {txn.customer?.fullName || `Customer #${txn.customer?.id || "N/A"}`}
+                    </td>
+                    <td style={{ padding: "12px 8px", fontFamily: "monospace", fontSize: "13px" }}>
+                      {txn.customer?.accountNumber || "-"}
                     </td>
                     <td style={{ padding: "12px 8px" }}>
                       <span className={isCredit ? "badge-active" : "badge-inactive"}>{txn.type}</span>

@@ -1,45 +1,91 @@
-import { createContext, useState, useContext, useEffect } from "react";
+import { createContext, useState, useContext, useEffect, useCallback } from "react";
 
-// Create the context
-const AuthContext = createContext();
+const AuthContext = createContext(null);
 
-// Provider component to manage login states
 export function AuthProvider({ children }) {
-  // Load initial state from localStorage or default to false
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(() => {
-    return localStorage.getItem("isAdminLoggedIn") === "true";
+  const [token, setToken] = useState(() => localStorage.getItem("token"));
+  const [user, setUser] = useState(() => {
+    const role = localStorage.getItem("userRole");
+    const id = localStorage.getItem("userId");
+    const username = localStorage.getItem("username");
+    return role ? { role, id, username } : null;
   });
 
-  const [isCustomerLoggedIn, setIsCustomerLoggedIn] = useState(() => {
-    return localStorage.getItem("isCustomerLoggedIn") === "true";
+  // Dark Mode state
+  const [darkMode, setDarkMode] = useState(() => {
+    return localStorage.getItem("bank_theme") === "dark";
   });
 
-  const [isStaffLoggedIn, setIsStaffLoggedIn] = useState(() => {
-    return localStorage.getItem("isStaffLoggedIn") === "true";
-  });
-
-  // Save state to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem("isAdminLoggedIn", isAdminLoggedIn);
-    localStorage.setItem("isCustomerLoggedIn", isCustomerLoggedIn);
-    localStorage.setItem("isStaffLoggedIn", isStaffLoggedIn);
-  }, [isAdminLoggedIn, isCustomerLoggedIn, isStaffLoggedIn]);
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+      document.body.classList.add("dark-theme");
+      localStorage.setItem("bank_theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      document.body.classList.remove("dark-theme");
+      localStorage.setItem("bank_theme", "light");
+    }
+  }, [darkMode]);
 
-  return (
-    <AuthContext.Provider
-      value={{
-        isAdminLoggedIn,
-        setIsAdminLoggedIn,
-        isCustomerLoggedIn,
-        setIsCustomerLoggedIn,
-        isStaffLoggedIn,
-        setIsStaffLoggedIn,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const toggleTheme = () => {
+    setDarkMode((prev) => !prev);
+  };
+
+  const login = useCallback((authData) => {
+    const { accessToken, refreshToken, role, userId, username } = authData;
+    if (accessToken) localStorage.setItem("token", accessToken);
+    if (refreshToken) localStorage.setItem("refreshToken", refreshToken);
+    if (role) localStorage.setItem("userRole", role);
+    if (userId !== undefined && userId !== null) localStorage.setItem("userId", userId.toString());
+    if (username) localStorage.setItem("username", username);
+
+    setToken(accessToken);
+    setUser({ role, id: userId, username });
+  }, []);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
+    localStorage.removeItem("userRole");
+    localStorage.removeItem("userId");
+    localStorage.removeItem("username");
+    sessionStorage.clear();
+
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  // Listen for auto-logout emitted by axios interceptor
+  useEffect(() => {
+    const handleAutoLogout = () => {
+      logout();
+    };
+    window.addEventListener("auth:logout", handleAutoLogout);
+    return () => window.removeEventListener("auth:logout", handleAutoLogout);
+  }, [logout]);
+
+  const value = {
+    token,
+    user,
+    role: user?.role || null,
+    isAuthenticated: Boolean(token && user?.role),
+    isAdminLoggedIn: user?.role === "ADMIN",
+    isCustomerLoggedIn: user?.role === "CUSTOMER",
+    isStaffLoggedIn: user?.role === "STAFF",
+    darkMode,
+    toggleTheme,
+    login,
+    logout,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-// Custom hook to access the context
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};

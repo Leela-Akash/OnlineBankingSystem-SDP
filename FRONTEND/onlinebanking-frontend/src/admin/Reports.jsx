@@ -1,52 +1,64 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import React, { useEffect, useState, useCallback } from 'react';
+import apiClient from '../utils/axiosConfig';
+import { useToast } from '../components/Toast';
+import Skeleton from '../components/Skeleton';
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 import './admincss/Reports.css';
-
-const API_URL = `${import.meta.env.VITE_API_URL}/admin`;
 
 export default function Reports() {
   const [reports, setReports] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { addToast } = useToast();
 
-  useEffect(() => {
-    fetchReports();
-  }, []);
-
-  const fetchReports = async () => {
+  const fetchReportsAndLogs = useCallback(async () => {
     try {
-      setLoading(true);
-      const response = await axios.get(`${API_URL}/reports`);
-      setReports(response.data);
-      setError('');
+      const [reportsRes, logsRes] = await Promise.all([
+        apiClient.get('/admin/reports'),
+        apiClient.get('/admin/audit-logs'),
+      ]);
+      setReports(reportsRes.data);
+      setAuditLogs(Array.isArray(logsRes.data) ? logsRes.data : []);
     } catch (err) {
-      setError('Failed to load reports');
-      console.error(err);
+      console.error('Failed to load reports:', err);
+      addToast('Failed to load system reports and audit logs', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [addToast]);
+
+  useEffect(() => {
+    fetchReportsAndLogs();
+  }, [fetchReportsAndLogs]);
 
   if (loading) {
     return (
-      <div className="reports-loading">
-        <div className="spinner"></div>
-        <p>Loading reports...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="reports-error">
-        <p>{error}</p>
+      <div style={{ maxWidth: '1140px', margin: '30px auto' }}>
+        <Skeleton height="50px" width="300px" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px', marginTop: '20px' }}>
+          <Skeleton height="120px" />
+          <Skeleton height="120px" />
+          <Skeleton height="120px" />
+        </div>
+        <Skeleton height="350px" style={{ marginTop: '24px' }} />
       </div>
     );
   }
 
   if (!reports) {
-    return <div>No reports available</div>;
+    return <div className="fintech-card" style={{ maxWidth: '600px', margin: '40px auto', textAlign: 'center' }}>No reports available</div>;
   }
 
   const userStats = reports.userStats || {};
@@ -63,257 +75,150 @@ export default function Reports() {
       style: 'currency',
       currency: 'INR',
       minimumFractionDigits: 0,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 2,
     }).format(amount || 0);
   };
 
-  const formatNumber = (num) => {
-    return new Intl.NumberFormat('en-IN').format(num || 0);
-  };
+  const formatNumber = (num) => new Intl.NumberFormat('en-IN').format(num || 0);
 
   return (
-    <div className="reports-container">
-      <div className="reports-header">
-        <h1>📊 System Reports & Analytics</h1>
-        <button onClick={fetchReports} className="refresh-btn">
-          🔄 Refresh
+    <div className="reports-container" style={{ maxWidth: '1140px', margin: '20px auto', display: 'flex', flexDirection: 'column', gap: '28px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h1 style={{ fontSize: '28px', fontWeight: 800 }}>📊 System Analytics & Audit Reports</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+            Aggregated real-time JPQL metrics, financial ledgers, and compliance audit trail
+          </p>
+        </div>
+        <button onClick={fetchReportsAndLogs} className="fintech-btn-primary">
+          🔄 Synchronize Metrics
         </button>
       </div>
 
-      {/* Customer Account Reports */}
-      <div className="report-section">
-        <h2>👥 Customer Account Reports</h2>
-        <div className="stats-grid">
-          <div className="stat-card blue">
-            <div className="stat-icon">👤</div>
-            <div className="stat-content">
-              <h3>{formatNumber(userStats.totalCustomers)}</h3>
-              <p>Total Customers</p>
-              <small>{userStats.activeAccounts || 0} Active Accounts</small>
-            </div>
+      {/* Primary KPI Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+        <div className="fintech-card" style={{ borderLeft: '4px solid var(--primary)' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Registered Customers</div>
+          <div style={{ fontSize: '26px', fontWeight: 700, marginTop: '4px' }}>{formatNumber(userStats.totalCustomers)}</div>
+          <small style={{ color: 'var(--success)', fontWeight: 600 }}>{userStats.activeAccounts || 0} Active Ledgers</small>
+        </div>
+
+        <div className="fintech-card" style={{ borderLeft: '4px solid var(--success)' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Deposits Volume</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--success)', marginTop: '4px' }}>
+            {formatCurrency(transactionStats.totalDeposits)}
           </div>
-          <div className="stat-card green">
-            <div className="stat-icon">🧑‍💼</div>
-            <div className="stat-content">
-              <h3>{formatNumber(userStats.totalStaff)}</h3>
-              <p>Total Staff</p>
-            </div>
+          <small style={{ color: 'var(--text-muted)' }}>{formatNumber(transactionStats.depositCount)} transactions</small>
+        </div>
+
+        <div className="fintech-card" style={{ borderLeft: '4px solid var(--danger)' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Outflow Volume</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: 'var(--danger)', marginTop: '4px' }}>
+            {formatCurrency(transactionStats.totalWithdrawals)}
           </div>
+          <small style={{ color: 'var(--text-muted)' }}>{formatNumber(transactionStats.withdrawalCount)} transactions</small>
+        </div>
+
+        <div className="fintech-card" style={{ borderLeft: '4px solid #8b5cf6' }}>
+          <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Net Ledger Balance</div>
+          <div style={{ fontSize: '24px', fontWeight: 700, color: '#8b5cf6', marginTop: '4px' }}>
+            {formatCurrency(transactionStats.netBalance)}
+          </div>
+          <small style={{ color: 'var(--text-muted)' }}>{formatNumber(transactionStats.totalTransactions)} total records</small>
         </div>
       </div>
 
-      {/* Transaction Reports */}
-      <div className="report-section">
-        <h2>💳 Transaction Reports</h2>
-        <div className="stats-grid">
-          <div className="stat-card green">
-            <div className="stat-icon">💰</div>
-            <div className="stat-content">
-              <h3>{formatCurrency(transactionStats.totalDeposits)}</h3>
-              <p>Total Deposits</p>
-              <small>{formatNumber(transactionStats.depositCount)} transactions</small>
-            </div>
-          </div>
-          <div className="stat-card red">
-            <div className="stat-icon">💸</div>
-            <div className="stat-content">
-              <h3>{formatCurrency(transactionStats.totalWithdrawals)}</h3>
-              <p>Total Withdrawals</p>
-              <small>{formatNumber(transactionStats.withdrawalCount)} transactions</small>
-            </div>
-          </div>
-          <div className="stat-card blue">
-            <div className="stat-icon">📊</div>
-            <div className="stat-content">
-              <h3>{formatCurrency(transactionStats.netBalance)}</h3>
-              <p>Net Balance</p>
-              <small>{formatNumber(transactionStats.totalTransactions)} total transactions</small>
-            </div>
-          </div>
+      {/* Charts Section */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+        <div className="fintech-card">
+          <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>Transaction Volume Distribution</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <PieChart>
+              <Pie
+                data={[
+                  { name: 'Deposits', value: transactionBreakdown.Deposits || 0 },
+                  { name: 'Withdrawals', value: transactionBreakdown.Withdrawals || 0 },
+                ]}
+                cx="50%"
+                cy="50%"
+                outerRadius={80}
+                innerRadius={45}
+                paddingAngle={4}
+                dataKey="value"
+              >
+                <Cell fill="#10b981" />
+                <Cell fill="#ef4444" />
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
-      </div>
 
-      {/* Loan Reports */}
-      <div className="report-section">
-        <h2>🏦 Loan Reports</h2>
-        <div className="stats-grid">
-          <div className="stat-card orange">
-            <div className="stat-icon">📋</div>
-            <div className="stat-content">
-              <h3>{formatNumber(loanStats.pendingLoans)}</h3>
-              <p>Pending Loans</p>
-              <small>{formatCurrency(loanStats.pendingLoanAmount)}</small>
-            </div>
-          </div>
-          <div className="stat-card blue">
-            <div className="stat-icon">✅</div>
-            <div className="stat-content">
-              <h3>{formatNumber(loanStats.approvedLoans)}</h3>
-              <p>Approved Loans</p>
-              <small>{formatCurrency(loanStats.approvedLoanAmount)}</small>
-            </div>
-          </div>
-          <div className="stat-card green">
-            <div className="stat-icon">🔄</div>
-            <div className="stat-content">
-              <h3>{formatNumber(loanStats.activeLoans)}</h3>
-              <p>Active Loans</p>
-            </div>
-          </div>
-          <div className="stat-card red">
-            <div className="stat-icon">⚠️</div>
-            <div className="stat-content">
-              <h3>{formatNumber(loanStats.overdueLoans)}</h3>
-              <p>Overdue Loans</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Revenue Reports */}
-      <div className="report-section">
-        <h2>💵 Revenue Reports</h2>
-        <div className="stats-grid">
-          <div className="stat-card green">
-            <div className="stat-icon">📈</div>
-            <div className="stat-content">
-              <h3>{formatCurrency(revenueStats.estimatedInterestEarnings)}</h3>
-              <p>Interest Earned</p>
-            </div>
-          </div>
-          <div className="stat-card purple">
-            <div className="stat-icon">💼</div>
-            <div className="stat-content">
-              <h3>{formatCurrency(revenueStats.serviceCharges)}</h3>
-              <p>Service Charges</p>
-            </div>
-          </div>
-          <div className="stat-card blue">
-            <div className="stat-icon">💰</div>
-            <div className="stat-content">
-              <h3>{formatCurrency(revenueStats.totalRevenue)}</h3>
-              <p>Total Revenue</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* System Health & Compliance */}
-      <div className="report-section">
-        <h2>⚡ System Health & Compliance</h2>
-        <div className="stats-grid">
-          <div className="stat-card success">
-            <div className="stat-icon">✅</div>
-            <div className="stat-content">
-              <h3>{systemHealth.transactionSuccessRate?.toFixed(1)}%</h3>
-              <p>Transaction Success Rate</p>
-            </div>
-          </div>
-          <div className="stat-card info">
-            <div className="stat-icon">🖥️</div>
-            <div className="stat-content">
-              <h3>{systemHealth.apiUptime}%</h3>
-              <p>API Uptime</p>
-            </div>
-          </div>
-          <div className="stat-card warning">
-            <div className="stat-icon">❌</div>
-            <div className="stat-content">
-              <h3>{formatNumber(systemHealth.failedTransactions)}</h3>
-              <p>Failed Transactions</p>
-            </div>
-          </div>
-          <div className="stat-card alert">
-            <div className="stat-icon">🔔</div>
-            <div className="stat-content">
-              <h3>{formatNumber(systemHealth.highValueTransactions)}</h3>
-              <p>High-Value Transactions</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Visual Analytics with Charts */}
-      <div className="report-section">
-        <h2>📊 Transaction Volume Charts</h2>
-        <div className="charts-grid">
-          {/* Transaction Distribution Chart */}
-          <div className="chart-card">
-            <h3>Transaction Distribution</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Deposits', value: transactionBreakdown.Deposits || 0 },
-                    { name: 'Withdrawals', value: transactionBreakdown.Withdrawals || 0 }
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {[transactionBreakdown.Deposits || 0, transactionBreakdown.Withdrawals || 0].map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={index === 0 ? '#4caf50' : '#f44336'} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Financial Overview Chart */}
-          <div className="chart-card">
-            <h3>Financial Overview</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={[
+        <div className="fintech-card">
+          <h3 style={{ fontSize: '16px', marginBottom: '16px' }}>Financial Flow Overview</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart
+              data={[
                 { name: 'Deposits', amount: transactionStats.totalDeposits },
                 { name: 'Withdrawals', amount: transactionStats.totalWithdrawals },
-                { name: 'Net Balance', amount: transactionStats.netBalance }
-              ]}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={(value) => formatCurrency(value)} />
-                <Bar dataKey="amount" fill="#2196f3" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                { name: 'Net Assets', amount: transactionStats.netBalance },
+              ]}
+            >
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip formatter={(value) => formatCurrency(value)} />
+              <Bar dataKey="amount" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Loan Type Breakdown */}
-      {Object.keys(loanTypeCount).length > 0 && (
-        <div className="report-section">
-          <h2>📈 Loan Type Breakdown</h2>
-          <div className="breakdown-grid">
-            <div className="breakdown-card">
-              <h3>Loan Types by Count</h3>
-              <div className="breakdown-list">
-                {Object.entries(loanTypeCount).map(([type, count]) => (
-                  <div key={type} className="breakdown-item">
-                    <span className="type-name">{type}</span>
-                    <span className="type-value">{count}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="breakdown-card">
-              <h3>Loan Types by Amount</h3>
-              <div className="breakdown-list">
-                {Object.entries(loanTypeAmount).map(([type, amount]) => (
-                  <div key={type} className="breakdown-item">
-                    <span className="type-name">{type}</span>
-                    <span className="type-value">{formatCurrency(amount)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+      {/* Audit Log Table */}
+      <div className="fintech-card">
+        <h3 style={{ fontSize: '18px', marginBottom: '8px' }}>Security & Transaction Audit Trail ({auditLogs.length})</h3>
+        <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '16px' }}>
+          Immutable records of financial transfers, underwriting decisions, and administrative actions
+        </p>
+
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
+                <th style={{ padding: '10px 8px' }}>Timestamp</th>
+                <th style={{ padding: '10px 8px' }}>Actor</th>
+                <th style={{ padding: '10px 8px' }}>Action</th>
+                <th style={{ padding: '10px 8px' }}>Target</th>
+                <th style={{ padding: '10px 8px' }}>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {auditLogs.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                    No audit records registered yet
+                  </td>
+                </tr>
+              ) : (
+                auditLogs.slice(0, 15).map((log) => (
+                  <tr key={log.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td style={{ padding: '10px 8px', color: 'var(--text-muted)' }}>
+                      {log.timestamp ? new Date(log.timestamp).toLocaleString() : 'Recent'}
+                    </td>
+                    <td style={{ padding: '10px 8px', fontWeight: 600 }}>{log.actor || 'SYSTEM'}</td>
+                    <td style={{ padding: '10px 8px' }}>
+                      <span className="badge-active" style={{ fontSize: '11px' }}>{log.action}</span>
+                    </td>
+                    <td style={{ padding: '10px 8px' }}>{log.targetEntity || '-'}</td>
+                    <td style={{ padding: '10px 8px', color: 'var(--text-secondary)' }}>{log.details || '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }

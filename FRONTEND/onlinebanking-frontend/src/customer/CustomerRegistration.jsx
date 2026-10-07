@@ -1,11 +1,8 @@
 import { useState } from "react";
-import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import apiClient from "../utils/axiosConfig";
+import { useToast } from "../components/Toast";
 import "./customercss/CustomerRegistration.css";
-
-// Use Vite environment variable
-
-const API_URL = `${import.meta.env.VITE_API_URL}/customer`;
 
 export default function CustomerRegistration() {
   const [formData, setFormData] = useState({
@@ -21,6 +18,9 @@ export default function CustomerRegistration() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { addToast } = useToast();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -28,36 +28,36 @@ export default function CustomerRegistration() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    try {
-      const response = await axios.post(`${API_URL}/register`, formData);
+    setLoading(true);
+    setError("");
+    setMessage("");
 
-      // ✅ Success case (201 Created)
-      if (response.status === 201) {
-        setMessage(response.data);
-        setError("");
-        // Reset form
-        setFormData({
-          fullName: "",
-          gender: "",
-          dob: "",
-          email: "",
-          username: "",
-          password: "",
-          phone: "",
-          address: "",
-        });
-      }
+    try {
+      const response = await apiClient.post("/customer/register", formData);
+      const successMsg = response.data?.message || "Registration successful!";
+      setMessage(successMsg);
+      addToast(successMsg, "success");
+
+      setFormData({
+        fullName: "",
+        gender: "",
+        dob: "",
+        email: "",
+        username: "",
+        password: "",
+        phone: "",
+        address: "",
+      });
+
+      setTimeout(() => {
+        navigate("/customerlogin");
+      }, 2000);
     } catch (err) {
-      // ✅ Duplicate / Conflict (409)
-      if (err.response?.status === 409) {
-        setError(err.response.data); // "Username already exists!"
-        setMessage("");
-      } 
-      // ✅ Any other error
-      else {
-        setError("An unexpected error occurred.");
-        setMessage("");
-      }
+      const errMsg = err.response?.data?.message || err.response?.data?.error || "Registration failed. Please check your inputs.";
+      setError(errMsg);
+      addToast(errMsg, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -109,7 +109,27 @@ export default function CustomerRegistration() {
             value={formData.email}
             onChange={handleChange}
             required
-            placeholder="Enter email"
+            placeholder="Enter email address"
+          />
+
+          <label htmlFor="phone">Phone Number</label>
+          <input
+            type="tel"
+            id="phone"
+            value={formData.phone}
+            onChange={handleChange}
+            required
+            placeholder="10-digit phone number"
+          />
+
+          <label htmlFor="address">Address</label>
+          <textarea
+            id="address"
+            value={formData.address}
+            onChange={handleChange}
+            required
+            placeholder="Enter residential address"
+            rows="2"
           />
 
           <label htmlFor="username">Username</label>
@@ -129,33 +149,15 @@ export default function CustomerRegistration() {
             value={formData.password}
             onChange={handleChange}
             required
-            placeholder="Create password"
+            placeholder="Enter strong password"
           />
 
-          <label htmlFor="phone">Phone Number</label>
-          <input
-            type="tel"
-            id="phone"
-            value={formData.phone}
-            onChange={handleChange}
-            required
-            placeholder="Enter phone number"
-          />
-
-          <label htmlFor="address">Address</label>
-          <input
-            type="text"
-            id="address"
-            value={formData.address}
-            onChange={handleChange}
-            required
-            placeholder="Enter your address"
-          />
-
-          <button type="submit">Create Account</button>
+          <button type="submit" className="signup-button" disabled={loading}>
+            {loading ? "Creating Account..." : "Register"}
+          </button>
         </form>
 
-        <p className="login-link">
+        <p className="signin-link">
           Already have an account? <Link to="/customerlogin">Sign In</Link>
         </p>
       </div>

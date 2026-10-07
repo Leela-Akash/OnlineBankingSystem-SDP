@@ -1,76 +1,62 @@
-import { NavLink, useNavigate, Routes, Route } from "react-router-dom";
-import { FaSignOutAlt } from "react-icons/fa";
+import React from "react";
+import { NavLink, useNavigate, Outlet } from "react-router-dom";
+import { FaSignOutAlt, FaSun, FaMoon } from "react-icons/fa";
 import { useAuth } from "../contextapi/AuthContext";
 import "./admincss/AdminNavbar.css";
 
- // import other pages when ready
-// import CustomerTransactions from "../customer/Transactions";
- 
-// import LoanRequests from "../customer/LoanRequests";
-// import StaffDashboard from "../staff/StaffDashboard";
-// import Reports from "../staff/Reports";
-import AddStaff from './AddStaff';
-import AdminDashboard from './AdminDashboard';
-import ManageCustomers from "./ManageCustomers";
-import ManageStaff from './ManageStaff';
-import Reports from './Reports';
-import AllTransactions from './AllTransactions';
-
 export default function AdminNavBar() {
   const navigate = useNavigate();
-  const { setIsAdminLoggedIn, setIsStaffLoggedIn, setIsCustomerLoggedIn } = useAuth();
+  const { logout, darkMode, toggleTheme } = useAuth();
 
   const handleLogout = () => {
-    sessionStorage.clear();
-    localStorage.removeItem("token");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("userRole");
-    setIsAdminLoggedIn(false);
-    setIsStaffLoggedIn(false);
-    setIsCustomerLoggedIn(false);
+    logout();
     navigate("/adminlogin", { replace: true });
   };
 
   return (
     <>
       <nav className="admin-navbar">
-        <div className="logo">OnlineBank</div>
+        <div className="logo">
+          <NavLink to="/admin/dashboard" style={{ color: 'inherit', textDecoration: 'none' }}>
+            ⚡ Nexus Admin Control
+          </NavLink>
+        </div>
 
         <div className="nav-links">
-        
-          {/* Uncomment when pages are ready */}
-          <NavLink to="/"> Dashboard</NavLink>
-        
-          <NavLink to="/addstaff">Add Staff</NavLink>
-          <NavLink to="/managestaff"> All Staff</NavLink>
-          <NavLink to="/managecustomers">All Customers</NavLink>
-            <NavLink to="/customer/transactions">Transactions</NavLink>
-         
-          
-          <NavLink to="/staff/reports">Reports</NavLink>
+          <NavLink to="/admin/dashboard">Dashboard</NavLink>
+          <NavLink to="/admin/all-transactions">Transactions</NavLink>
+          <NavLink to="/admin/manage-customers">Customers</NavLink>
+          <NavLink to="/admin/manage-staff">Staff</NavLink>
+          <NavLink to="/admin/add-staff">Add Staff</NavLink>
+          <NavLink to="/admin/reports">Reports & Analytics</NavLink>
+        </div>
 
-          <button className="logout-btn" onClick={handleLogout}>
+        <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontSize: '16px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Toggle theme"
+          >
+            {darkMode ? <FaSun /> : <FaMoon />}
+          </button>
+
+          <button className="logout-btn" onClick={handleLogout} title="Log Out">
             <FaSignOutAlt />
           </button>
         </div>
       </nav>
 
       {/* Routed Pages */}
-      <main className="content">
-        <Routes>
-         
-           <Route path="/" element={<AdminDashboard/>} />
-          {/* Uncomment when pages are ready */}
-           <Route path="/customer/transactions" element={<AllTransactions/>} />
-         
-       
-       
-          <Route path="/staff/reports" element={<Reports/>} />
-            <Route path="/managecustomers" element={<ManageCustomers/>} />
-              <Route path="/managestaff" element={<ManageStaff/>} />
-           <Route path="/addstaff" element={<AddStaff/>} />
-             
-        </Routes>
+      <main className="content" style={{ padding: '24px', maxWidth: '1280px', margin: '0 auto', minHeight: '85vh' }}>
+        <Outlet />
       </main>
     </>
   );

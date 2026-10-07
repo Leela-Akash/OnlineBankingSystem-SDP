@@ -1,20 +1,18 @@
 import { useState } from "react";
-import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
- 
-import { useAuth } from "../contextapi/AuthContext"
+import { useAuth } from "../contextapi/AuthContext";
+import { useToast } from "../components/Toast";
+import apiClient from "../utils/axiosConfig";
 import "./admincss/AdminLogin.css";
-
-// Vite environment variable for backend URL
-const API_URL = `${import.meta.env.VITE_API_URL}/admin`;
 
 export default function AdminLogin() {
   const [formData, setFormData] = useState({ username: "", password: "" });
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
-  const { setIsAdminLoggedIn } = useAuth();
+  const { login } = useAuth();
+  const { addToast } = useToast();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -22,32 +20,39 @@ export default function AdminLogin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+
     try {
-      const response = await axios.post(`${API_URL}/login`, formData);
-      if (response.status === 200) {
-        // JWT login - store token and user info
-        const { token, id, username, role } = response.data;
-        localStorage.setItem("token", token);
-        localStorage.setItem("userId", id);
-        localStorage.setItem("userRole", role);
-        sessionStorage.setItem("admin", JSON.stringify({ id, username, role }));
-        
-        setIsAdminLoggedIn(true);
-        navigate("/");
-      } else {
-        setMessage(response.data);
-      }
+      const response = await apiClient.post("/admin/login", formData);
+      const { accessToken, token, refreshToken, userId, id, username, role } = response.data;
+      const validToken = accessToken || token;
+
+      login({
+        accessToken: validToken,
+        refreshToken,
+        userId: userId || id || 0,
+        username: username || formData.username,
+        role: role || "ADMIN",
+      });
+
+      sessionStorage.setItem("admin", JSON.stringify({ username: formData.username, role: "ADMIN" }));
+
+      addToast("Signed in as Administrator", "success");
+      navigate("/admin/dashboard");
     } catch (err) {
-      setError(err.response?.data || "An unexpected error occurred.");
+      const msg = err.response?.data?.message || err.response?.data?.error || "Invalid username or password";
+      setError(msg);
+      addToast(msg, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="login-container">
       <div className="login-form">
-        <h2>Admin Login</h2>
-
-        {message && <p className="success-message">{message}</p>}
+        <h2>Administrator Login</h2>
         {error && <p className="error-message">{error}</p>}
 
         <form onSubmit={handleSubmit}>
@@ -57,8 +62,9 @@ export default function AdminLogin() {
             id="username"
             value={formData.username}
             onChange={handleChange}
-            placeholder="Enter username"
+            placeholder="Enter admin username"
             required
+            autoComplete="username"
           />
 
           <label htmlFor="password">Password</label>
@@ -69,15 +75,16 @@ export default function AdminLogin() {
             onChange={handleChange}
             placeholder="Enter password"
             required
+            autoComplete="current-password"
           />
 
-          <button type="submit" className="signin-button">
-            Login
+          <button type="submit" className="signin-button" disabled={loading}>
+            {loading ? "Authenticating..." : "Login"}
           </button>
         </form>
 
         <p className="signup-link">
-          Not an Admin? <Link to="/">Back to Home</Link>
+          <Link to="/">Back to Home</Link>
         </p>
       </div>
     </div>

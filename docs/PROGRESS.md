@@ -46,15 +46,15 @@
 - [x] Build and test verification, git commit: `phase-5: api quality`.
 
 ## Phase 6: Frontend Modernization
-- [ ] Universal use of `apiClient` (`axiosConfig.js`), token refresh on 401 interceptor, redirect on expiry.
-- [ ] JWT-based auth replacing localStorage flags, `ProtectedRoute` with role checking, centralized routing with layout wrappers and `<Outlet />`.
-- [ ] Fix NotFound route order and rename `Transcations.jsx` to `Transactions.jsx`.
-- [ ] Visibility-aware polling (`document.visibilityState`) with sane interval.
-- [ ] Loading skeletons, toast notifications, error boundaries/states, form validations.
-- [ ] Complete ManageCustomers (view, edit, deactivate) and Staff Management.
-- [ ] Responsive modern fintech UI overhaul.
-- [ ] Recruiter-impressing features: spending analytics chart, search/filter/CSV export, dark mode toggle, branded PDF statement download.
-- [ ] Build and test verification, git commit: `phase-6: frontend modernization`.
+- [x] Universal use of `apiClient` (`axiosConfig.js`), token refresh on 401 interceptor, redirect on expiry.
+- [x] JWT-based auth replacing localStorage flags, `ProtectedRoute` with role checking, centralized routing with layout wrappers and `<Outlet />`.
+- [x] Fix NotFound route order and rename `Transcations.jsx` to `Transactions.jsx`.
+- [x] Visibility-aware polling (`document.visibilityState`) with sane interval.
+- [x] Loading skeletons, toast notifications, error boundaries/states, form validations.
+- [x] Complete ManageCustomers (view, edit, deactivate) and Staff Management.
+- [x] Responsive modern fintech UI overhaul.
+- [x] Recruiter-impressing features: spending analytics chart, search/filter/CSV export, dark mode toggle, branded PDF statement download.
+- [x] Build and test verification, git commit: `phase-6: frontend modernization`.
 
 ## Phase 7: Repository and Documentation
 - [ ] Remove `BACKEND/.metadata` from git and create comprehensive `.gitignore`.

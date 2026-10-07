@@ -1,18 +1,18 @@
 import { useState } from "react";
-import axios from "axios";
-import "./staffcss/StaffLogin.css";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contextapi/AuthContext";
-
-const API_URL = `${import.meta.env.VITE_API_URL}/staff`;
+import { useToast } from "../components/Toast";
+import apiClient from "../utils/axiosConfig";
+import "./staffcss/StaffLogin.css";
 
 export default function StaffLogin() {
   const [formData, setFormData] = useState({ username: "", password: "" });
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const navigate = useNavigate();
-  const { setIsStaffLoggedIn } = useAuth();
+  const { login } = useAuth();
+  const { addToast } = useToast();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -20,66 +20,74 @@ export default function StaffLogin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+
     try {
-      const res = await axios.post(`${API_URL}/login`, formData);
-      if (res.status === 200) {
-        // JWT login - store token and user info
-        const { token, id, username, role } = res.data;
-        localStorage.setItem("token", token);
-        localStorage.setItem("userId", id);
-        localStorage.setItem("userRole", role);
-        
-        // Get full staff data
-        try {
-          const staffRes = await axios.get(`${API_URL}/profile/${id}`);
-          sessionStorage.setItem("staff", JSON.stringify(staffRes.data));
-        } catch (err) {
-          sessionStorage.setItem("staff", JSON.stringify({ id, username }));
-        }
+      const res = await apiClient.post("/staff/login", formData);
+      const { accessToken, token, refreshToken, userId, id, username, role } = res.data;
+      const validToken = accessToken || token;
+      const validId = userId || id;
 
-        setIsStaffLoggedIn(true);
-        setMessage("Login successful!");
-        setError("");
+      login({
+        accessToken: validToken,
+        refreshToken,
+        userId: validId,
+        username: username || formData.username,
+        role: role || "STAFF",
+      });
 
-        navigate("/dashboard");  
+      try {
+        const staffRes = await apiClient.get(`/staff/profile/${validId}`);
+        sessionStorage.setItem("staff", JSON.stringify(staffRes.data));
+      } catch {
+        sessionStorage.setItem("staff", JSON.stringify({ id: validId, username: formData.username }));
       }
+
+      addToast("Signed in as Bank Staff", "success");
+      navigate("/staff/dashboard");
     } catch (err) {
-      setMessage("");
-      if (err.response) setError(err.response.data);
-      else setError("Unexpected error occurred. Please try again.");
+      const msg = err.response?.data?.message || err.response?.data?.error || "Invalid username or password";
+      setError(msg);
+      addToast(msg, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="register-container">
       <form className="register-form" onSubmit={handleSubmit}>
-        <h3>Staff Login</h3>
-        {message && <p className="success-message">{message}</p>}
+        <h3>Staff Portal Login</h3>
         {error && <p className="error-message">{error}</p>}
 
         <div>
-          <label>Username</label>
+          <label htmlFor="username">Username</label>
           <input
             type="text"
             id="username"
             value={formData.username}
             onChange={handleChange}
             required
+            autoComplete="username"
           />
         </div>
 
         <div>
-          <label>Password</label>
+          <label htmlFor="password">Password</label>
           <input
             type="password"
             id="password"
             value={formData.password}
             onChange={handleChange}
             required
+            autoComplete="current-password"
           />
         </div>
 
-        <button type="submit">Login</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Authenticating..." : "Login"}
+        </button>
       </form>
     </div>
   );

@@ -1,41 +1,52 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/axiosConfig';
+import { useAuth } from '../contextapi/AuthContext';
+import { useToast } from '../components/Toast';
+import Skeleton from '../components/Skeleton';
 import './customercss/Loans.css';
 
-const API_URL = `${import.meta.env.VITE_API_URL}/loan`;
-
 export default function Loans() {
+  const { user } = useAuth();
   const [customer, setCustomer] = useState(null);
   const [myLoans, setMyLoans] = useState([]);
   const [showLoanForm, setShowLoanForm] = useState(false);
-  const [loading, setLoading] = useState(false);
-  
-  // Form state
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
   const [formData, setFormData] = useState({
     loanAmount: '',
     loanType: 'Personal Loan',
-    tenureMonths: '',
-    purpose: ''
+    tenureMonths: '12',
+    purpose: '',
   });
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
+
+  const { addToast } = useToast();
 
   useEffect(() => {
-    const storedCustomer = JSON.parse(sessionStorage.getItem('customer'));
-    if (!storedCustomer) {
-      setError('Please log in first');
-      return;
-    }
-    setCustomer(storedCustomer);
-    fetchMyLoans(storedCustomer.id);
-  }, []);
-
-  const fetchMyLoans = async (customerId) => {
+    let stored = null;
     try {
-      const res = await axios.get(`${API_URL}/customer/${customerId}`);
-      setMyLoans(res.data);
+      stored = JSON.parse(sessionStorage.getItem('customer'));
+    } catch {}
+
+    const custId = user?.id || stored?.id;
+    if (custId) {
+      loadLoans(custId);
+    }
+  }, [user]);
+
+  const loadLoans = async (customerId) => {
+    setLoading(true);
+    try {
+      const [custRes, loansRes] = await Promise.all([
+        apiClient.get(`/customer/${customerId}`),
+        apiClient.get(`/loan/customer/${customerId}`),
+      ]);
+      setCustomer(custRes.data);
+      setMyLoans(loansRes.data || []);
     } catch (err) {
-      setError('Failed to fetch loans');
+      addToast('Error fetching loans', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -43,187 +54,204 @@ export default function Loans() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const calculateEstimatedEMI = () => {
+    const P = parseFloat(formData.loanAmount) || 0;
+    const N = parseInt(formData.tenureMonths, 10) || 12;
+    const R = 8.5 / (12 * 100); // 8.5% annual rate
+    if (P <= 0 || N <= 0) return 0;
+    const emi = (P * R * Math.pow(1 + R, N)) / (Math.pow(1 + R, N) - 1);
+    return isNaN(emi) ? 0 : Math.round(emi);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMessage('');
-    setError('');
+    const amount = parseFloat(formData.loanAmount);
+    if (!amount || amount <= 0) {
+      addToast('Please enter a valid loan amount', 'warning');
+      return;
+    }
 
+    setSubmitting(true);
     try {
-      setLoading(true);
-      const res = await axios.post(`${API_URL}/request/${customer.id}`, formData);
-      
-      setMessage('Loan request submitted successfully! Your request is pending approval.');
+      const payload = {
+        loanAmount: amount,
+        loanType: formData.loanType,
+        tenureMonths: parseInt(formData.tenureMonths, 10),
+        purpose: formData.purpose || `${formData.loanType} request`,
+        interestRate: 8.5,
+      };
+
+      await apiClient.post(`/loan/request/${customer.id}`, payload);
+      addToast('Loan application submitted for underwriting review', 'success');
       setShowLoanForm(false);
-      setFormData({ loanAmount: '', loanType: 'Personal Loan', tenureMonths: '', purpose: '' });
-      fetchMyLoans(customer.id);
+      setFormData({ loanAmount: '', loanType: 'Personal Loan', tenureMonths: '12', purpose: '' });
+      loadLoans(customer.id);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to submit loan request');
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Failed to submit loan application';
+      addToast(msg, 'error');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      'Pending': '#ff9800',
-      'Approved': '#4caf50',
-      'Rejected': '#f44336',
-      'Active': '#2196f3',
-      'Completed': '#9e9e9e'
-    };
-    return colors[status] || '#666';
+  const getStatusBadge = (status) => {
+    const s = (status || '').toLowerCase();
+    if (s === 'approved' || s === 'disbursed') return <span className="badge-active">{status}</span>;
+    if (s === 'rejected') return <span className="badge-inactive">{status}</span>;
+    return <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 10px', borderRadius: '9999px', fontSize: '12px', fontWeight: 600 }}>{status || 'Pending'}</span>;
   };
 
-  if (!customer) {
-    return <div className="loading-message">Loading...</div>;
+  if (loading) {
+    return (
+      <div style={{ maxWidth: '900px', margin: '40px auto' }}>
+        <Skeleton height="40px" width="250px" />
+        <Skeleton height="160px" style={{ marginTop: '20px' }} />
+        <Skeleton height="160px" style={{ marginTop: '20px' }} />
+      </div>
+    );
   }
 
   return (
-    <div className="loans-container">
-      <div className="loans-header">
-        <h2>💰 Loan Services</h2>
-        <button 
-          className="request-loan-btn"
+    <div className="loans-container" style={{ maxWidth: '960px', margin: '30px auto' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h2 style={{ fontSize: '26px', fontWeight: 700 }}>🏦 Lending Services</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
+            Flexible personal, auto, and home financing with fixed 8.5% interest
+          </p>
+        </div>
+
+        <button
+          className="fintech-btn-primary"
           onClick={() => setShowLoanForm(!showLoanForm)}
         >
-          {showLoanForm ? 'Cancel' : '+ Request New Loan'}
+          {showLoanForm ? '✕ Close Application' : '+ Apply for Loan'}
         </button>
       </div>
 
-      {message && (
-        <div className="success-message">✓ {message}</div>
-      )}
-
-      {error && (
-        <div className="error-message">✗ {error}</div>
-      )}
-
       {showLoanForm && (
-        <div className="loan-request-form">
-          <h3>New Loan Request</h3>
+        <div className="fintech-card" style={{ marginBottom: '32px' }}>
+          <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Loan Application & EMI Calculator</h3>
           <form onSubmit={handleSubmit}>
-            <div className="form-row">
-              <div className="form-group">
-                <label>Loan Type *</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Loan Type</label>
                 <select
                   name="loanType"
                   value={formData.loanType}
                   onChange={handleChange}
-                  required
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
                 >
-                  <option value="Personal Loan">Personal Loan (15% APR)</option>
-                  <option value="Home Loan">Home Loan (8.5% APR)</option>
-                  <option value="Car Loan">Car Loan (10.5% APR)</option>
-                  <option value="Business Loan">Business Loan (12.5% APR)</option>
+                  <option value="Personal Loan">Personal Loan (8.5%)</option>
+                  <option value="Home Loan">Home Mortgage (8.5%)</option>
+                  <option value="Auto Loan">Auto Loan (8.5%)</option>
+                  <option value="Education Loan">Education Loan (8.5%)</option>
                 </select>
               </div>
 
-              <div className="form-group">
-                <label>Loan Amount (₹) *</label>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Principal Amount (INR)</label>
                 <input
                   type="number"
                   name="loanAmount"
+                  min="5000"
+                  step="1000"
                   value={formData.loanAmount}
                   onChange={handleChange}
-                  min="10000"
-                  max="10000000"
+                  placeholder="e.g. 100000"
                   required
-                  placeholder="Enter amount"
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
                 />
               </div>
-            </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label>Tenure (Months) *</label>
-                <input
-                  type="number"
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Tenure (Months)</label>
+                <select
                   name="tenureMonths"
                   value={formData.tenureMonths}
                   onChange={handleChange}
-                  min="12"
-                  max="360"
-                  required
-                  placeholder="e.g., 60"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Purpose *</label>
-                <input
-                  type="text"
-                  name="purpose"
-                  value={formData.purpose}
-                  onChange={handleChange}
-                  required
-                  placeholder="What will you use this loan for?"
-                />
+                  style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+                >
+                  <option value="6">6 Months</option>
+                  <option value="12">12 Months (1 Year)</option>
+                  <option value="24">24 Months (2 Years)</option>
+                  <option value="36">36 Months (3 Years)</option>
+                  <option value="60">60 Months (5 Years)</option>
+                </select>
               </div>
             </div>
 
-            <button 
-              type="submit" 
-              className="submit-loan-btn"
-              disabled={loading}
-            >
-              {loading ? 'Submitting...' : 'Submit Loan Request'}
-            </button>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Loan Purpose</label>
+              <input
+                type="text"
+                name="purpose"
+                value={formData.purpose}
+                onChange={handleChange}
+                placeholder="e.g. Home renovation, higher studies"
+                required
+                style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', color: 'var(--text-main)' }}
+              />
+            </div>
+
+            {/* Estimated EMI Pill */}
+            <div style={{ backgroundColor: 'var(--bg-main)', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Estimated Monthly EMI:</span>
+                <span style={{ fontWeight: 800, fontSize: '18px', color: 'var(--primary)', marginLeft: '10px' }}>
+                  ₹{calculateEstimatedEMI().toLocaleString('en-IN')}/mo
+                </span>
+              </div>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>APR: 8.5% fixed</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button type="button" onClick={() => setShowLoanForm(false)} style={{ padding: '10px 16px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'none', cursor: 'pointer', color: 'var(--text-main)' }}>
+                Cancel
+              </button>
+              <button type="submit" className="fintech-btn-primary" disabled={submitting}>
+                {submitting ? 'Submitting Application...' : 'Submit Loan Request'}
+              </button>
+            </div>
           </form>
         </div>
       )}
 
-      <div className="my-loans-section">
-        <h3>My Loan Requests</h3>
-        {myLoans.length === 0 ? (
-          <div className="no-loans">
-            <p>You don't have any loan requests yet.</p>
-            <p>Click "Request New Loan" to apply for a loan.</p>
-          </div>
-        ) : (
-          <div className="loans-grid">
-            {myLoans.map(loan => (
-              <div key={loan.id} className="loan-card">
-                <div className="loan-header">
-                  <h4>{loan.loanType}</h4>
-                  <span 
-                    className="status-badge"
-                    style={{ backgroundColor: getStatusColor(loan.status) }}
-                  >
-                    {loan.status}
-                  </span>
+      {/* Existing Loans List */}
+      <h3 style={{ fontSize: '18px', marginBottom: '16px' }}>Active & Past Loan Applications ({myLoans.length})</h3>
+      {myLoans.length === 0 ? (
+        <div className="fintech-card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+          <p>You have not applied for any loans yet.</p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {myLoans.map((loan) => (
+            <div key={loan.id} className="fintech-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <h4 style={{ fontSize: '18px', fontWeight: 600 }}>{loan.loanType}</h4>
+                  {getStatusBadge(loan.status)}
                 </div>
-                <div className="loan-details">
-                  <div className="detail-item">
-                    <span className="label">Amount:</span>
-                    <span className="value">₹{loan.loanAmount?.toLocaleString()}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="label">Interest Rate:</span>
-                    <span className="value">{loan.interestRate}% APR</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="label">Tenure:</span>
-                    <span className="value">{loan.tenureMonths} months</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="label">Purpose:</span>
-                    <span className="value">{loan.purpose}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="label">Requested:</span>
-                    <span className="value">{new Date(loan.requestDate).toLocaleDateString()}</span>
-                  </div>
-                </div>
-                {loan.comments && (
-                  <div className="comments">
-                    <strong>Comments:</strong> {loan.comments}
-                  </div>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '4px' }}>
+                  Applied: {loan.requestDate || 'Recent'} • Tenure: {loan.tenureMonths} months • Purpose: {loan.purpose}
+                </p>
+                {loan.adminComments && (
+                  <p style={{ fontSize: '12px', color: 'var(--primary)', marginTop: '4px' }}>
+                    Underwriter Note: {loan.adminComments}
+                  </p>
                 )}
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Sanctioned Principal</span>
+                <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--text-main)' }}>
+                  ₹{Number(loan.loanAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

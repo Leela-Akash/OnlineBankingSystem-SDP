@@ -1,17 +1,17 @@
 import { useState } from "react";
-import axios from "axios";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../contextapi/AuthContext";
+import { useToast } from "../components/Toast";
+import apiClient from "../utils/axiosConfig";
 import "./customercss/CustomerLogin.css";
-
-// API base URL from .env
-const API_URL = `${import.meta.env.VITE_API_URL}/customer`;
 
 export default function CustomerLogin() {
   const [formData, setFormData] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { setIsCustomerLoggedIn } = useAuth();
+  const { login } = useAuth();
+  const { addToast } = useToast();
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
@@ -19,28 +19,38 @@ export default function CustomerLogin() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+
     try {
-      const res = await axios.post(`${API_URL}/login`, formData);
-      // JWT login - store token and user info
-      const { token, id, username, role } = res.data;
-      localStorage.setItem("token", token);
-      localStorage.setItem("userId", id);
-      localStorage.setItem("userRole", role);
-      
-      // Get full customer data
+      const res = await apiClient.post("/customer/login", formData);
+      const { accessToken, token, refreshToken, userId, id, username, role } = res.data;
+      const validToken = accessToken || token;
+      const validId = userId || id;
+
+      login({
+        accessToken: validToken,
+        refreshToken,
+        userId: validId,
+        username: username || formData.username,
+        role: role || "CUSTOMER",
+      });
+
       try {
-        const customerRes = await axios.get(`${API_URL}/${id}`);
+        const customerRes = await apiClient.get(`/customer/${validId}`);
         sessionStorage.setItem("customer", JSON.stringify(customerRes.data));
-      } catch (err) {
-        // If fetch fails, store basic info
-        sessionStorage.setItem("customer", JSON.stringify({ id, username }));
+      } catch {
+        sessionStorage.setItem("customer", JSON.stringify({ id: validId, username: formData.username }));
       }
-      
-      setIsCustomerLoggedIn(true);
-      setError("");
-      navigate("/");
+
+      addToast("Successfully signed in as Customer", "success");
+      navigate("/customer/profile");
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data || "Invalid Username or Password");
+      const msg = err.response?.data?.message || err.response?.data?.error || "Invalid username or password";
+      setError(msg);
+      addToast(msg, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -59,6 +69,7 @@ export default function CustomerLogin() {
             onChange={handleChange}
             required
             placeholder="Enter your username"
+            autoComplete="username"
           />
 
           <label htmlFor="password">Password</label>
@@ -69,15 +80,16 @@ export default function CustomerLogin() {
             onChange={handleChange}
             required
             placeholder="Enter your password"
+            autoComplete="current-password"
           />
 
-          <button type="submit" className="signin-button">
-            Sign In
+          <button type="submit" className="signin-button" disabled={loading}>
+            {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
         <p className="signup-link">
-          Don't have an account? <Link to="/customerregistration">Sign Up</Link>
+          Don't have an account? <Link to="/customerregistration">Register here</Link>
         </p>
       </div>
     </div>

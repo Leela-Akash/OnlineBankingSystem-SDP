@@ -1,125 +1,115 @@
-import React, { useEffect, useState } from "react";
-import { NavLink, useNavigate, Routes, Route } from "react-router-dom";
-import { FaSignOutAlt } from "react-icons/fa";
+import React, { useEffect, useState, useCallback } from "react";
+import { NavLink, useNavigate, Outlet } from "react-router-dom";
+import { FaSignOutAlt, FaUserCircle, FaBell, FaSun, FaMoon } from "react-icons/fa";
 import { useAuth } from "../contextapi/AuthContext";
-import { FaUserCircle } from "react-icons/fa";
-import axios from "axios";
-// Customer pages
-import DepositWithdraw from "./DepositWithdraw";
-import Statements from "./Statements";
-
+import apiClient from "../utils/axiosConfig";
+import { useVisibilityPolling } from "../utils/useVisibilityPolling";
 import "../admin/admincss/AdminNavbar.css";
-import Home from './../main/Home';
-import Transferfunds from './Transferfunds';
-import CustomerProfile from "./CustomerProfile";
-import Loans from './Loans';
-import CustomerUpdateProfile from './UpdateProfile';
-import Notifications from './Notifications';
 
 export default function CustomerNavBar() {
   const navigate = useNavigate();
-  const { setIsCustomerLoggedIn } = useAuth(); // auth context
+  const { logout, darkMode, toggleTheme, user } = useAuth();
 
-  const [customer, setCustomer] = useState(null);
+  const [customer, setCustomer] = useState(() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("customer"));
+    } catch {
+      return null;
+    }
+  });
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    const storedCustomer = JSON.parse(sessionStorage.getItem("customer"));
-    if (!storedCustomer) {
-      navigate("/customerlogin", { replace: true });
-      return;
-    }
-    setCustomer(storedCustomer);
-    fetchUnreadCount(storedCustomer.id);
-    
-    // Auto-refresh unread count every 30 seconds
-    const interval = setInterval(() => {
-      fetchUnreadCount(storedCustomer.id);
-    }, 30000);
-    
-    return () => clearInterval(interval);
-  }, [navigate]);
-  
-  const fetchUnreadCount = async (customerId) => {
+  const fetchCustomerAndUnread = useCallback(async () => {
+    const customerId = user?.id || customer?.id;
+    if (!customerId) return;
+
     try {
-      const res = await axios.get(`${import.meta.env.VITE_API_URL}/notification/customer/${customerId}/unread/count`);
-      setUnreadCount(res.data.unreadCount);
+      // Fetch fresh customer details if not present
+      if (!customer) {
+        const custRes = await apiClient.get(`/customer/${customerId}`);
+        setCustomer(custRes.data);
+        sessionStorage.setItem("customer", JSON.stringify(custRes.data));
+      }
+
+      // Fetch unread count
+      const res = await apiClient.get(`/notification/customer/${customerId}/unread/count`);
+      if (res.data && res.data.unreadCount !== undefined) {
+        setUnreadCount(res.data.unreadCount);
+      }
     } catch (err) {
-      console.error('Error fetching unread count:', err);
+      console.error("Error refreshing customer status:", err);
     }
-  };
+  }, [user?.id, customer]);
+
+  useEffect(() => {
+    fetchCustomerAndUnread();
+  }, [fetchCustomerAndUnread]);
+
+  // Visibility-aware polling: automatically pauses when tab is hidden, refreshes on return
+  useVisibilityPolling(fetchCustomerAndUnread, 45000, Boolean(user?.id || customer?.id));
 
   const handleLogout = () => {
-    sessionStorage.clear();
-    localStorage.removeItem("token");
-    localStorage.removeItem("userId");
-    localStorage.removeItem("userRole");
-    setIsCustomerLoggedIn(false);
-    navigate("/customerlogin", { replace: true });  
+    logout();
+    navigate("/customerlogin", { replace: true });
   };
 
   return (
     <>
-      {/* 🔹 Top Navigation */}
       <nav className="admin-navbar">
-        <div className="logo">OnlineBank</div>
+        <div className="logo">
+          <NavLink to="/customer/profile" style={{ color: 'inherit', textDecoration: 'none' }}>
+            🏦 Nexus Banking
+          </NavLink>
+        </div>
 
         <div className="nav-links">
-          <NavLink to="/">Home</NavLink>
-
           <NavLink to="/customer/deposit-withdraw">Deposit / Withdraw</NavLink>
-          
-          <NavLink to="/customer/statements">Statements</NavLink>
-
+          <NavLink to="/customer/statements">Statements & Analytics</NavLink>
           <NavLink to="/funds">Fund Transfer</NavLink>
-        
           <NavLink to="/loans">Loans</NavLink>
-          
-          <NavLink to="/notifications">
+          <NavLink to="/notifications" style={{ position: 'relative' }}>
+            <FaBell style={{ marginRight: '4px' }} />
             Notifications
             {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}
           </NavLink>
         </div>
 
-        <div className="navbar-right">
+        <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
           {customer && (
-            <span className="welcome-text">
-              Welcome, {customer.fullName}
+            <span className="welcome-text" style={{ fontSize: '14px', fontWeight: 500 }}>
+              {customer.fullName}
             </span>
           )}
-          
-          <NavLink to="/profile" className="profile-icon-link">
-            <FaUserCircle />
+
+          <button
+            onClick={toggleTheme}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'inherit',
+              cursor: 'pointer',
+              fontSize: '16px',
+              display: 'flex',
+              alignItems: 'center',
+            }}
+            title="Toggle theme"
+          >
+            {darkMode ? <FaSun /> : <FaMoon />}
+          </button>
+
+          <NavLink to="/profile" className="profile-icon-link" title="My Profile">
+            <FaUserCircle size={22} />
           </NavLink>
 
-          <button className="logout-btn-icon" onClick={handleLogout}>
-            <FaSignOutAlt />
+          <button className="logout-btn-icon" onClick={handleLogout} title="Log Out">
+            <FaSignOutAlt size={18} />
           </button>
         </div>
-
       </nav>
 
-      {/* 🔹 Routed Pages */}
-      <main className="content">
-        <Routes>
-          {/* <Route path="/customer/dashboard" element={<CustomerDashboard />} />
-      
-    
-          <Route path="/customer/bill-payments" element={<BillPayments />} />
-          
-         
-          <Route path="/customer/profile" element={<CustomerProfile />} />
-          <Route path="/customer/update" element={<UpdateProfile />} /> */}
-
-           <Route path="/" element={<Home/>} />
-           <Route path="/customer/statements" element={<Statements />} />
-               <Route path="/customer/deposit-withdraw" element={<DepositWithdraw />} />
-                     <Route path="/funds" element={<Transferfunds/>} />
-                          <Route path="/profile" element={<CustomerProfile/>} />
-                          <Route path="/loans" element={<Loans/>} />
-                          <Route path="/notifications" element={<Notifications/>} />
-                    <Route path="/update" element={<CustomerUpdateProfile/>} />
-        </Routes>
+      {/* Render child pages via Outlet */}
+      <main className="content" style={{ padding: '24px', maxWidth: '1280px', margin: '0 auto', minHeight: '85vh' }}>
+        <Outlet />
       </main>
     </>
   );

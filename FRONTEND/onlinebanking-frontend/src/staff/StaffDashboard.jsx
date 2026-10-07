@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
+import { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
+import apiClient from "../utils/axiosConfig";
+import { useVisibilityPolling } from "../utils/useVisibilityPolling";
+import Skeleton from "../components/Skeleton";
 import "./staffcss/Dashboard.css";
-
-const API_URL = `${import.meta.env.VITE_API_URL}/staff`;
 
 export default function StaffDashboard() {
   const [stats, setStats] = useState({
@@ -10,82 +11,130 @@ export default function StaffDashboard() {
     totalDeposits: 0,
     totalWithdrawals: 0,
   });
+  const [pendingLoansCount, setPendingLoansCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError("");
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const [dashRes, loansRes] = await Promise.all([
+        apiClient.get("/staff/dashboard"),
+        apiClient.get("/loan/pending"),
+      ]);
 
-        const res = await axios.get(`${API_URL}/dashboard`);
-        const data = res.data;
-
-        setStats({
-          totalCustomers: data.totalCustomers,
-          totalDeposits: data.totalDeposits,
-          totalWithdrawals: data.totalWithdrawals,
-        });
-      } catch (err) {
-        console.error("Error fetching dashboard data:", err);
-        setError("Failed to load dashboard stats");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(fetchDashboardData, 10000);
-    return () => clearInterval(interval);
+      setStats({
+        totalCustomers: dashRes.data.totalCustomers || 0,
+        totalDeposits: dashRes.data.totalDeposits || 0,
+        totalWithdrawals: dashRes.data.totalWithdrawals || 0,
+      });
+      setPendingLoansCount((loansRes.data || []).length);
+      setError("");
+    } catch (err) {
+      console.error("Error fetching staff dashboard data:", err);
+      setError("Failed to synchronize branch statistics");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // Visibility-aware polling pauses when tab is hidden, refreshes on return
+  useVisibilityPolling(fetchDashboardData, 45000);
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p>Loading dashboard...</p>
+      <div style={{ maxWidth: "1000px", margin: "30px auto" }}>
+        <Skeleton height="50px" width="300px" />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginTop: "24px" }}>
+          <Skeleton height="120px" />
+          <Skeleton height="120px" />
+          <Skeleton height="120px" />
+          <Skeleton height="120px" />
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="staff-dashboard">
-      <div className="dashboard-header">
+    <div className="staff-dashboard" style={{ maxWidth: "1100px", margin: "20px auto" }}>
+      <div className="dashboard-header" style={{ marginBottom: "28px" }}>
         <div className="welcome-section">
-          <h1>Staff Dashboard</h1>
-          <p>Banking System Overview</p>
-        </div>
-        <div className="staff-avatar">
-          <span>S</span>
+          <h1 style={{ fontSize: "28px", fontWeight: 800 }}>Staff Operations Dashboard</h1>
+          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>
+            Branch Operational Metrics & Underwriting Queue
+          </p>
         </div>
       </div>
 
       {error && <p className="dashboard-error">{error}</p>}
 
-      <div className="stats-grid">
-        <div className="stat-card">
+      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "32px" }}>
+        <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--primary)" }}>
           <div className="stat-icon">👥</div>
           <div className="stat-content">
-            <h3>{stats.totalCustomers}</h3>
-            <p>Total Customers</p>
+            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.totalCustomers}</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Registered Accounts</p>
           </div>
         </div>
-        <div className="stat-card">
+
+        <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--success)" }}>
           <div className="stat-icon">💰</div>
           <div className="stat-content">
-            <h3>{stats.totalDeposits}</h3>
-            <p>Total Deposits</p>
+            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.totalDeposits}</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Deposits Processed</p>
           </div>
         </div>
-        <div className="stat-card">
+
+        <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--danger)" }}>
           <div className="stat-icon">💸</div>
           <div className="stat-content">
-            <h3>{stats.totalWithdrawals}</h3>
-            <p>Total Withdrawals</p>
+            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.totalWithdrawals}</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Withdrawals Processed</p>
           </div>
+        </div>
+
+        <div className="stat-card fintech-card" style={{ borderLeft: "4px solid #f59e0b" }}>
+          <div className="stat-icon">📋</div>
+          <div className="stat-content">
+            <h3 style={{ fontSize: "28px", fontWeight: 700, color: "#f59e0b" }}>{pendingLoansCount}</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Pending Loan Reviews</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Actions Panel */}
+      <div className="fintech-card">
+        <h3 style={{ fontSize: "18px", marginBottom: "16px" }}>Operational Workflows</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+          <Link to="/staffloans" style={{ textDecoration: "none" }}>
+            <div style={{ padding: "18px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-main)" }}>
+              <div style={{ fontWeight: 600, fontSize: "16px", color: "var(--text-main)" }}>📋 Loan Approval Queue</div>
+              <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
+                Review pending loan applications and disburse approved funds
+              </p>
+            </div>
+          </Link>
+
+          <Link to="/transactions" style={{ textDecoration: "none" }}>
+            <div style={{ padding: "18px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-main)" }}>
+              <div style={{ fontWeight: 600, fontSize: "16px", color: "var(--text-main)" }}>💳 Transaction Monitor</div>
+              <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
+                Inspect systemic transactions, audit references, and settlement timestamps
+              </p>
+            </div>
+          </Link>
+
+          <Link to="/customers" style={{ textDecoration: "none" }}>
+            <div style={{ padding: "18px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-main)" }}>
+              <div style={{ fontWeight: 600, fontSize: "16px", color: "var(--text-main)" }}>👥 Customer Directory</div>
+              <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
+                Browse customer profiles, ledger balances, and active account numbers
+              </p>
+            </div>
+          </Link>
         </div>
       </div>
     </div>

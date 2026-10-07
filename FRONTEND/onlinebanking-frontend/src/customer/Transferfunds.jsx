@@ -1,177 +1,191 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/axiosConfig';
+import { useAuth } from '../contextapi/AuthContext';
+import { useToast } from '../components/Toast';
 import './customercss/Transferfunds.css';
 
-function Transferfunds() {
+export default function Transferfunds() {
+  const { user } = useAuth();
   const [customer, setCustomer] = useState(null);
   const [balance, setBalance] = useState(0);
   const [toAccountNumber, setToAccountNumber] = useState('');
   const [amount, setAmount] = useState('');
-  const [message, setMessage] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const API_URL = `${import.meta.env.VITE_API_URL}/transaction`;
+  const { addToast } = useToast();
 
   useEffect(() => {
-    const storedCustomer = JSON.parse(sessionStorage.getItem('customer'));
-    if (!storedCustomer) {
-      setError('Please log in first');
-      return;
-    }
-    setCustomer(storedCustomer);
-    fetchBalance(storedCustomer.id);
-  }, []);
-
-  const fetchBalance = async (customerId) => {
+    let customerData = null;
     try {
-      const res = await axios.get(`${API_URL}/balance/${customerId}`);
-      setBalance(res.data.balance);
-    } catch (err) {
-      setError('Failed to fetch balance');
+      customerData = JSON.parse(sessionStorage.getItem('customer'));
+    } catch {}
+
+    const custId = user?.id || customerData?.id;
+    if (custId) {
+      loadCustomer(custId);
+    }
+  }, [user]);
+
+  const loadCustomer = async (id) => {
+    try {
+      const res = await apiClient.get(`/customer/${id}`);
+      setCustomer(res.data);
+      setBalance(res.data.balance || 0);
+    } catch {
+      try {
+        const balRes = await apiClient.get(`/transaction/balance/${id}`);
+        setBalance(balRes.data.balance || 0);
+      } catch (err) {
+        console.error('Error fetching balance:', err);
+      }
     }
   };
 
   const handleTransfer = async (e) => {
     e.preventDefault();
-    setMessage('');
-    setError('');
 
-    if (!toAccountNumber) {
-      setError('Please enter receiver account number');
+    if (!toAccountNumber || toAccountNumber.trim().length !== 12) {
+      addToast('Recipient account number must be exactly 12 digits', 'warning');
       return;
     }
 
-    if (toAccountNumber.length !== 12) {
-      setError('Account number must be 12 digits');
+    if (customer && customer.accountNumber === toAccountNumber.trim()) {
+      addToast('Cannot transfer funds to your own account', 'warning');
       return;
     }
 
-    if (!amount || parseFloat(amount) <= 0) {
-      setError('Please enter a valid amount');
+    const transferAmount = parseFloat(amount);
+    if (!transferAmount || transferAmount <= 0) {
+      addToast('Please enter a valid transfer amount greater than 0', 'warning');
       return;
     }
 
-    if (parseFloat(amount) > balance) {
-      setError('Insufficient balance');
+    if (transferAmount > balance) {
+      addToast('Insufficient funds for this transfer', 'error');
       return;
     }
+
+    setLoading(true);
+    // Unique idempotency key preventing accidental duplicate submissions
+    const idempotencyKey = `TRANSFER-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
     try {
-      setLoading(true);
-      const res = await axios.post(
-        `${API_URL}/transfer/by-account`,
-        null,
-        {
-          params: {
-            fromCustomerId: customer.id,
-            toAccountNumber: toAccountNumber,
-            amount: parseFloat(amount)
-          }
-        }
-      );
+      const payload = {
+        fromCustomerId: customer?.id || user?.id,
+        toAccountNumber: toAccountNumber.trim(),
+        amount: transferAmount,
+        idempotencyKey: idempotencyKey,
+      };
 
-      setMessage(res.data.message || res.data);
+      const res = await apiClient.post('/transaction/transfer/by-account', payload, {
+        headers: {
+          'Idempotency-Key': idempotencyKey,
+        },
+      });
+
+      const successMsg = res.data?.message || 'Transfer completed successfully!';
+      addToast(successMsg, 'success');
       setAmount('');
       setToAccountNumber('');
-      fetchBalance(customer.id); // Refresh balance
+      loadCustomer(customer?.id || user?.id);
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Transfer failed');
+      const errMsg = err.response?.data?.error || err.response?.data?.message || 'Transfer failed';
+      addToast(errMsg, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  if (!customer) {
-    return <div className="loading-message">Loading...</div>;
-  }
-
   return (
-    <div className="transfer-container">
-      <div className="transfer-header">
-        <h2>💰 Fund Transfer</h2>
-        <p className="current-balance">Current Balance: ₹{balance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+    <div className="transfer-container fintech-card" style={{ maxWidth: '640px', margin: '40px auto' }}>
+      <div className="transfer-header" style={{ marginBottom: '24px' }}>
+        <h2>⚡ Secure Wire Transfer</h2>
+        <p style={{ color: 'var(--text-muted)', marginTop: '4px' }}>
+          Instant, idempotent account-to-account funds transfer
+        </p>
       </div>
 
-      {message && (
-        <div className="success-message">
-          ✓ {message}
+      <div style={{
+        backgroundColor: 'var(--bg-main)',
+        padding: '16px 20px',
+        borderRadius: '10px',
+        border: '1px solid var(--border-color)',
+        marginBottom: '24px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <div>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>From Account</span>
+          <div style={{ fontWeight: 600, fontSize: '16px', color: 'var(--text-main)' }}>
+            #{customer?.accountNumber || 'Pending'}
+          </div>
         </div>
-      )}
-
-      {error && (
-        <div className="error-message">
-          ✗ {error}
+        <div style={{ textAlign: 'right' }}>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Available Balance</span>
+          <div style={{ fontWeight: 800, fontSize: '20px', color: 'var(--primary)' }}>
+            ₹{Number(balance).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+          </div>
         </div>
-      )}
-
-      <div className="my-account-info">
-        <p>
-          <strong>Your Account Number:</strong> {customer.accountNumber || 'Not Assigned'}
-        </p>
-        {!customer.accountNumber && (
-          <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', color: '#d32f2f' }}>
-            ⚠️ Please contact admin to get your account number assigned.
-          </p>
-        )}
       </div>
 
       <form onSubmit={handleTransfer} className="transfer-form">
-        <div className="form-group">
-          <label htmlFor="toAccountNumber">
-            Receiver Account Number <span className="required">*</span>
+        <div style={{ marginBottom: '18px' }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>
+            Recipient 12-Digit Account Number
           </label>
           <input
             type="text"
-            id="toAccountNumber"
+            maxLength="12"
             value={toAccountNumber}
             onChange={(e) => setToAccountNumber(e.target.value.replace(/\D/g, ''))}
-            placeholder="Enter receiver's 12-digit account number"
+            placeholder="e.g. 100000000002"
             required
-            maxLength="12"
-            minLength="12"
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              fontSize: '16px',
+              backgroundColor: 'var(--bg-card)',
+              color: 'var(--text-main)',
+              letterSpacing: '1px'
+            }}
           />
-          <small>Enter 12-digit account number</small>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="amount">
-            Transfer Amount <span className="required">*</span>
+        <div style={{ marginBottom: '24px' }}>
+          <label style={{ display: 'block', fontWeight: 600, marginBottom: '6px', fontSize: '14px' }}>
+            Transfer Amount (INR)
           </label>
           <input
             type="number"
-            id="amount"
+            min="1"
+            step="any"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            placeholder="Enter amount to transfer"
+            placeholder="Enter amount to send"
             required
-            min="0.01"
-            step="0.01"
-            max={balance}
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              fontSize: '16px',
+              backgroundColor: 'var(--bg-card)',
+              color: 'var(--text-main)'
+            }}
           />
         </div>
 
         <button
           type="submit"
-          className="transfer-button"
-          disabled={loading || !toAccountNumber || !amount || toAccountNumber.length !== 12}
+          className="fintech-btn-primary"
+          disabled={loading}
+          style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '16px' }}
         >
-          {loading ? 'Processing...' : 'Transfer Funds'}
+          {loading ? 'Executing Wire Transfer...' : 'Confirm & Transfer Funds'}
         </button>
       </form>
-
-      <div className="transfer-info">
-        <h3>📋 Transfer Information</h3>
-        <ul>
-          <li>Enter the receiver's 12-digit account number to transfer funds</li>
-          <li>Ensure you have sufficient balance before transferring</li>
-          <li>Transfer will be recorded in your transaction history</li>
-          <li>Both sender and receiver will receive transaction notifications</li>
-          <li>Your account number is displayed at the top</li>
-        </ul>
-      </div>
     </div>
   );
 }
-
-export default Transferfunds;

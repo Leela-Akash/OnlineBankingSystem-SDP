@@ -84,11 +84,10 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
 
-                        // Admin-only endpoints
-                        .requestMatchers("/admin/**", "/api/v1/admin/**", "/staff/add", "/api/v1/staff/add").hasRole("ADMIN")
-
                         // Staff and Admin endpoints
                         .requestMatchers(
+                                "/admin/customers",
+                                "/api/v1/admin/customers",
                                 "/staff/**",
                                 "/api/v1/staff/**",
                                 "/loan/pending",
@@ -104,6 +103,9 @@ public class SecurityConfig {
                                 "/transaction/all",
                                 "/api/v1/transaction/all"
                         ).hasAnyRole("STAFF", "ADMIN")
+
+                        // Admin-only endpoints
+                        .requestMatchers("/admin/**", "/api/v1/admin/**", "/staff/add", "/api/v1/staff/add").hasRole("ADMIN")
 
                         // Customer / shared endpoints requiring authentication
                         .requestMatchers(
