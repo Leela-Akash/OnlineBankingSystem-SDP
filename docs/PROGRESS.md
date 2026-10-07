@@ -25,12 +25,12 @@
 - [x] Build and test verification, git commit: `phase-2: financial correctness`.
 
 ## Phase 3: Database and Config
-- [ ] Flyway migrations for full schema + demo seed data (1 admin, 1 staff, 3 customers with sample transactions and loans).
-- [ ] Sensible defaults in `application.properties` (localhost MySQL) and Spring profiles (`dev`, `prod`, `test`).
-- [ ] Backend port default 8080 aligned with frontend `.env` and `.env.example`.
-- [ ] `docker-compose.yml` orchestrating MySQL, backend, and frontend with a single command.
-- [ ] Spring Boot Actuator health endpoint configured and accessible.
-- [ ] Build and test verification, git commit: `phase-3: database and config`.
+- [x] Flyway migrations for full schema + demo seed data (1 admin, 1 staff, 3 customers with sample transactions and loans).
+- [x] Sensible defaults in `application.properties` (localhost MySQL) and Spring profiles (`dev`, `prod`, `test`).
+- [x] Backend port default 8080 aligned with frontend `.env` and `.env.example`.
+- [x] `docker-compose.yml` orchestrating MySQL, backend, and frontend with a single command.
+- [x] Spring Boot Actuator health endpoint configured and accessible.
+- [x] Build and test verification, git commit: `phase-3: database and config`.
 
 ## Phase 4: Testing and CI
 - [ ] Service layer unit tests (transfers, loans, validations, limits, balance checks).
