@@ -1,40 +1,54 @@
+/* ==========================================================================
+   Nexus Banking - Staff Transactions Ledger Styles
+   ========================================================================== */
+
 .transactions-container {
-  padding: 20px;
-  max-width: 1000px;
-  margin: auto;
-  font-family: Arial, sans-serif;
+  padding: 28px;
+  max-width: 1240px;
+  margin: 0 auto;
 }
 
-.transactions-container h2 {
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-table {
+.transactions-container table {
   width: 100%;
   border-collapse: collapse;
+  font-size: 13px;
 }
 
-thead tr {
-  background-color: #f2f2f2;
+.transactions-container thead th {
+  padding: 14px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  background: transparent;
 }
 
-th, td {
-  border: 1px solid #ddd;
-  padding: 8px;
-  text-align: left;
+.transactions-container tbody td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  vertical-align: middle;
 }
 
-tr:nth-child(even) {
-  background-color: #f9f9f9;
+.transactions-container tbody tr {
+  transition: background-color 0.15s ease;
 }
 
-tr:hover {
-  background-color: #f1f1f1;
+.transactions-container tbody tr:hover {
+  background-color: rgba(37, 99, 235, 0.03);
 }
 
-.error-message {
-  color: red;
-  text-align: center;
-  margin-bottom: 10px;
+.transactions-container select,
+.transactions-container input[type="text"] {
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.transactions-container select:focus,
+.transactions-container input[type="text"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }

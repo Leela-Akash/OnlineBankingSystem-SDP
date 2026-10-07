@@ -1,25 +1,50 @@
 import { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { 
+  FaUsers, 
+  FaMoneyBillWave, 
+  FaHandHoldingUsd, 
+  FaClipboardList, 
+  FaCheckCircle, 
+  FaArrowRight, 
+  FaFileInvoiceDollar,
+  FaShieldAlt,
+  FaExchangeAlt
+} from "react-icons/fa";
 import apiClient from "../utils/axiosConfig";
+import { useAuth } from "../contextapi/AuthContext";
 import { useVisibilityPolling } from "../utils/useVisibilityPolling";
 import Skeleton from "../components/Skeleton";
+import { useToast } from "../components/Toast";
 import "./staffcss/Dashboard.css";
 
 export default function StaffDashboard() {
+  const { user } = useAuth();
+  const { addToast } = useToast();
   const [stats, setStats] = useState({
     totalCustomers: 0,
     totalDeposits: 0,
     totalWithdrawals: 0,
   });
-  const [pendingLoansCount, setPendingLoansCount] = useState(0);
+  const [pendingLoans, setPendingLoans] = useState([]);
+  const [recentTransactions, setRecentTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [approvingId, setApprovingId] = useState(null);
+
+  const staffDetails = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("staff")) || {};
+    } catch {
+      return {};
+    }
+  })();
 
   const fetchDashboardData = useCallback(async () => {
     try {
-      const [dashRes, loansRes] = await Promise.all([
+      const [dashRes, loansRes, txRes] = await Promise.all([
         apiClient.get("/staff/dashboard"),
         apiClient.get("/loan/pending"),
+        apiClient.get("/transaction/all"),
       ]);
 
       setStats({
@@ -27,11 +52,11 @@ export default function StaffDashboard() {
         totalDeposits: dashRes.data.totalDeposits || 0,
         totalWithdrawals: dashRes.data.totalWithdrawals || 0,
       });
-      setPendingLoansCount((loansRes.data || []).length);
-      setError("");
+      setPendingLoans(loansRes.data || []);
+      const txList = Array.isArray(txRes.data) ? txRes.data : txRes.data?.content || [];
+      setRecentTransactions(txList.slice(0, 5));
     } catch (err) {
       console.error("Error fetching staff dashboard data:", err);
-      setError("Failed to synchronize branch statistics");
     } finally {
       setLoading(false);
     }
@@ -41,100 +66,211 @@ export default function StaffDashboard() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Visibility-aware polling pauses when tab is hidden, refreshes on return
-  useVisibilityPolling(fetchDashboardData, 45000);
+  useVisibilityPolling(fetchDashboardData, 30000);
+
+  const handleQuickApprove = async (loanId) => {
+    setApprovingId(loanId);
+    try {
+      await apiClient.put(`/loan/approve/${loanId}`, {
+        comments: "Approved via Staff Quick Actions",
+      });
+      addToast("Loan application approved!", "success");
+      fetchDashboardData();
+    } catch (err) {
+      addToast(err.response?.data?.error || "Failed to approve loan", "error");
+    } finally {
+      setApprovingId(null);
+    }
+  };
 
   if (loading) {
     return (
-      <div style={{ maxWidth: "1000px", margin: "30px auto" }}>
-        <Skeleton height="50px" width="300px" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginTop: "24px" }}>
-          <Skeleton height="120px" />
-          <Skeleton height="120px" />
-          <Skeleton height="120px" />
-          <Skeleton height="120px" />
+      <div className="staff-dash-container">
+        <Skeleton height="140px" style={{ borderRadius: "16px", marginBottom: "24px" }} />
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "24px" }}>
+          <Skeleton height="110px" />
+          <Skeleton height="110px" />
+          <Skeleton height="110px" />
+          <Skeleton height="110px" />
         </div>
+        <Skeleton height="280px" style={{ borderRadius: "16px" }} />
       </div>
     );
   }
 
+  const staffDisplayName = staffDetails.fullName || user?.username || "Branch Officer";
+
   return (
-    <div className="staff-dashboard" style={{ maxWidth: "1100px", margin: "20px auto" }}>
-      <div className="dashboard-header" style={{ marginBottom: "28px" }}>
-        <div className="welcome-section">
-          <h1 style={{ fontSize: "28px", fontWeight: 800 }}>Staff Operations Dashboard</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>
-            Branch Operational Metrics & Underwriting Queue
-          </p>
+    <div className="staff-dash-container">
+      {/* Modern Executive Header */}
+      <div className="staff-header-banner">
+        <div className="staff-header-text">
+          <div className="staff-system-status">
+            <span className="status-dot-pulse"></span>
+            <span>Core Ledger Connected • Branch Node #01</span>
+          </div>
+          <h1>Welcome, {staffDisplayName}</h1>
+          <p>Nexus Operations Command & Underwriting Workflow Console</p>
+        </div>
+        <div className="staff-header-actions">
+          <Link to="/staffloans" className="staff-banner-btn">
+            <FaClipboardList />
+            <span>Review Loans ({pendingLoans.length})</span>
+          </Link>
         </div>
       </div>
 
-      {error && <p className="dashboard-error">{error}</p>}
-
-      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "32px" }}>
-        <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--primary)" }}>
-          <div className="stat-icon">👥</div>
-          <div className="stat-content">
-            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.totalCustomers}</h3>
-            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Registered Accounts</p>
+      {/* KPI Stats Grid */}
+      <div className="staff-kpi-grid">
+        <div className="staff-kpi-card fintech-card kpi-blue">
+          <div className="kpi-icon-wrap"><FaUsers /></div>
+          <div className="kpi-content">
+            <span className="kpi-label">Customer Accounts</span>
+            <h3 className="kpi-value">{stats.totalCustomers}</h3>
+            <span className="kpi-subtext">Active ledger members</span>
           </div>
         </div>
 
-        <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--success)" }}>
-          <div className="stat-icon">💰</div>
-          <div className="stat-content">
-            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.totalDeposits}</h3>
-            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Deposits Processed</p>
+        <div className="staff-kpi-card fintech-card kpi-emerald">
+          <div className="kpi-icon-wrap"><FaMoneyBillWave /></div>
+          <div className="kpi-content">
+            <span className="kpi-label">Cumulative Deposits</span>
+            <h3 className="kpi-value">
+              ₹{Number(stats.totalDeposits || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </h3>
+            <span className="kpi-subtext">Total cash-in settlement</span>
           </div>
         </div>
 
-        <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--danger)" }}>
-          <div className="stat-icon">💸</div>
-          <div className="stat-content">
-            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.totalWithdrawals}</h3>
-            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Withdrawals Processed</p>
+        <div className="staff-kpi-card fintech-card kpi-rose">
+          <div className="kpi-icon-wrap"><FaHandHoldingUsd /></div>
+          <div className="kpi-content">
+            <span className="kpi-label">Total Outflow</span>
+            <h3 className="kpi-value">
+              ₹{Number(stats.totalWithdrawals || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            </h3>
+            <span className="kpi-subtext">Withdrawals & transfers</span>
           </div>
         </div>
 
-        <div className="stat-card fintech-card" style={{ borderLeft: "4px solid #f59e0b" }}>
-          <div className="stat-icon">📋</div>
-          <div className="stat-content">
-            <h3 style={{ fontSize: "28px", fontWeight: 700, color: "#f59e0b" }}>{pendingLoansCount}</h3>
-            <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Pending Loan Reviews</p>
+        <div className="staff-kpi-card fintech-card kpi-amber">
+          <div className="kpi-icon-wrap"><FaClipboardList /></div>
+          <div className="kpi-content">
+            <span className="kpi-label">Pending Loan Reviews</span>
+            <h3 className="kpi-value" style={{ color: "#f59e0b" }}>{pendingLoans.length}</h3>
+            <span className="kpi-subtext">
+              {pendingLoans.length > 0 ? "⚠️ Requires Underwriting" : "✓ Queue Clear"}
+            </span>
           </div>
         </div>
       </div>
 
-      {/* Quick Actions Panel */}
-      <div className="fintech-card">
-        <h3 style={{ fontSize: "18px", marginBottom: "16px" }}>Operational Workflows</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
-          <Link to="/staffloans" style={{ textDecoration: "none" }}>
-            <div style={{ padding: "18px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-main)" }}>
-              <div style={{ fontWeight: 600, fontSize: "16px", color: "var(--text-main)" }}>📋 Loan Approval Queue</div>
-              <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
-                Review pending loan applications and disburse approved funds
-              </p>
+      {/* Main 2-Column Section: Underwriting Queue + Recent Transactions */}
+      <div className="staff-main-grid">
+        {/* Left Column: Underwriting Queue */}
+        <div className="fintech-card staff-card-section">
+          <div className="card-section-header">
+            <div>
+              <h3>Priority Loan Underwriting Queue</h3>
+              <p>Borrower applications awaiting credit officer adjudication</p>
             </div>
-          </Link>
+            <Link to="/staffloans" className="section-see-all">
+              Full Queue <FaArrowRight style={{ fontSize: "11px" }} />
+            </Link>
+          </div>
 
-          <Link to="/transactions" style={{ textDecoration: "none" }}>
-            <div style={{ padding: "18px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-main)" }}>
-              <div style={{ fontWeight: 600, fontSize: "16px", color: "var(--text-main)" }}>💳 Transaction Monitor</div>
-              <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
-                Inspect systemic transactions, audit references, and settlement timestamps
-              </p>
+          {pendingLoans.length === 0 ? (
+            <div className="staff-empty-state">
+              <FaCheckCircle className="empty-state-icon" />
+              <p>No pending loan applications. All submissions adjudicated.</p>
             </div>
-          </Link>
+          ) : (
+            <div className="queue-list">
+              {pendingLoans.slice(0, 4).map((loan) => (
+                <div key={loan.id} className="queue-item">
+                  <div className="queue-item-info">
+                    <div className="queue-borrower-name">
+                      {loan.customer?.fullName || `Applicant #${loan.customer?.id}`}
+                    </div>
+                    <div className="queue-meta">
+                      <span>{loan.loanType}</span> • 
+                      <span>{loan.tenureMonths} Months</span> • 
+                      <span>Acc #{loan.customer?.accountNumber || "N/A"}</span>
+                    </div>
+                    {loan.purpose && (
+                      <div className="queue-purpose">Purpose: {loan.purpose}</div>
+                    )}
+                  </div>
 
-          <Link to="/customers" style={{ textDecoration: "none" }}>
-            <div style={{ padding: "18px", borderRadius: "8px", border: "1px solid var(--border-color)", backgroundColor: "var(--bg-main)" }}>
-              <div style={{ fontWeight: 600, fontSize: "16px", color: "var(--text-main)" }}>👥 Customer Directory</div>
-              <p style={{ fontSize: "13px", color: "var(--text-muted)", marginTop: "4px" }}>
-                Browse customer profiles, ledger balances, and active account numbers
-              </p>
+                  <div className="queue-item-actions">
+                    <div className="queue-amount">
+                      ₹{Number(loan.loanAmount || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </div>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        onClick={() => handleQuickApprove(loan.id)}
+                        disabled={approvingId === loan.id}
+                        className="quick-approve-btn"
+                      >
+                        {approvingId === loan.id ? "..." : "Approve"}
+                      </button>
+                      <Link to="/staffloans" className="quick-view-btn">
+                        Details
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          </Link>
+          )}
+        </div>
+
+        {/* Right Column: Workflows & Activity */}
+        <div className="staff-side-stack">
+          {/* Operations Shortcuts */}
+          <div className="fintech-card staff-card-section">
+            <h3 style={{ fontSize: "16px", marginBottom: "14px", fontWeight: 700 }}>
+              Staff Operational Modules
+            </h3>
+            <div className="workflow-links-grid">
+              <Link to="/staffloans" className="workflow-link-item">
+                <div className="wf-icon wf-purple"><FaClipboardList /></div>
+                <div>
+                  <div className="wf-title">Underwriting & Disbursements</div>
+                  <div className="wf-desc">Review risk, approve loans, and credit borrower accounts</div>
+                </div>
+              </Link>
+
+              <Link to="/transactions" className="workflow-link-item">
+                <div className="wf-icon wf-teal"><FaExchangeAlt /></div>
+                <div>
+                  <div className="wf-title">Transaction Ledger Monitor</div>
+                  <div className="wf-desc">Audit branch settlements, filter credits/debits, export CSV</div>
+                </div>
+              </Link>
+
+              <Link to="/customers" className="workflow-link-item">
+                <div className="wf-icon wf-blue"><FaUsers /></div>
+                <div>
+                  <div className="wf-title">Customer Accounts Directory</div>
+                  <div className="wf-desc">Search member files, verify KYC, inspect ledger balances</div>
+                </div>
+              </Link>
+            </div>
+          </div>
+
+          {/* Quick System Notice */}
+          <div className="fintech-card staff-security-badge-card">
+            <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+              <FaShieldAlt style={{ fontSize: "24px", color: "var(--success)" }} />
+              <div>
+                <h4 style={{ fontSize: "14px", fontWeight: 700, margin: 0 }}>Security Compliance Active</h4>
+                <p style={{ fontSize: "12px", color: "var(--text-muted)", margin: "4px 0 0 0" }}>
+                  All underwriting approvals are signed with your authenticated staff session key.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -8,6 +8,9 @@ export default function AdminNavBar() {
   const navigate = useNavigate();
   const { logout, darkMode, toggleTheme } = useAuth();
 
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const closeMenu = () => setMobileMenuOpen(false);
+
   const handleLogout = () => {
     logout();
     navigate("/adminlogin", { replace: true });
@@ -16,19 +19,38 @@ export default function AdminNavBar() {
   return (
     <>
       <nav className="admin-navbar">
-        <div className="logo">
-          <NavLink to="/admin/dashboard" style={{ color: 'inherit', textDecoration: 'none' }}>
-            ⚡ Nexus Admin Control
-          </NavLink>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            className="mobile-hamburger-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation"
+            style={{
+              display: 'none',
+              background: 'none',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '4px',
+            }}
+          >
+            {mobileMenuOpen ? '✕' : '☰'}
+          </button>
+
+          <div className="logo">
+            <NavLink to="/admin/dashboard" style={{ color: 'inherit', textDecoration: 'none' }}>
+              ⚡ Nexus Admin Control
+            </NavLink>
+          </div>
         </div>
 
-        <div className="nav-links">
-          <NavLink to="/admin/dashboard">Dashboard</NavLink>
-          <NavLink to="/admin/all-transactions">Transactions</NavLink>
-          <NavLink to="/admin/manage-customers">Customers</NavLink>
-          <NavLink to="/admin/manage-staff">Staff</NavLink>
-          <NavLink to="/admin/add-staff">Add Staff</NavLink>
-          <NavLink to="/admin/reports">Reports & Analytics</NavLink>
+        <div className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+          <NavLink to="/admin/dashboard" onClick={closeMenu}>Dashboard</NavLink>
+          <NavLink to="/admin/all-transactions" onClick={closeMenu}>Transactions</NavLink>
+          <NavLink to="/admin/manage-customers" onClick={closeMenu}>Customers</NavLink>
+          <NavLink to="/admin/manage-staff" onClick={closeMenu}>Staff</NavLink>
+          <NavLink to="/admin/add-staff" onClick={closeMenu}>Add Staff</NavLink>
+          <NavLink to="/admin/reports" onClick={closeMenu}>Reports & Analytics</NavLink>
         </div>
 
         <div className="navbar-right" style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>

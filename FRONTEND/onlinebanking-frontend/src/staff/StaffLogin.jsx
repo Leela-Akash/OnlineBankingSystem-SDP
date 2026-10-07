@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { FaUserShield, FaUser, FaLock, FaEye, FaEyeSlash, FaArrowRight, FaKey } from "react-icons/fa";
 import { useAuth } from "../contextapi/AuthContext";
 import { useToast } from "../components/Toast";
 import apiClient from "../utils/axiosConfig";
@@ -7,6 +8,7 @@ import "./staffcss/StaffLogin.css";
 
 export default function StaffLogin() {
   const [formData, setFormData] = useState({ username: "", password: "" });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -16,6 +18,10 @@ export default function StaffLogin() {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.id]: e.target.value });
+  };
+
+  const handleFillDemo = () => {
+    setFormData({ username: "staff", password: "staff123" });
   };
 
   const handleSubmit = async (e) => {
@@ -45,7 +51,7 @@ export default function StaffLogin() {
       }
 
       addToast("Signed in as Bank Staff", "success");
-      navigate("/staff/dashboard");
+      navigate("/dashboard");
     } catch (err) {
       const msg = err.response?.data?.message || err.response?.data?.error || "Invalid username or password";
       setError(msg);
@@ -56,39 +62,85 @@ export default function StaffLogin() {
   };
 
   return (
-    <div className="register-container">
-      <form className="register-form" onSubmit={handleSubmit}>
-        <h3>Staff Portal Login</h3>
-        {error && <p className="error-message">{error}</p>}
-
-        <div>
-          <label htmlFor="username">Username</label>
-          <input
-            type="text"
-            id="username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-            autoComplete="username"
-          />
+    <div className="staff-auth-wrapper">
+      <div className="staff-auth-card">
+        {/* Terminal Header */}
+        <div className="staff-card-header">
+          <div className="staff-badge">
+            <FaUserShield /> Authorised Personnel Terminal
+          </div>
+          <h2>Staff Operations Login</h2>
+          <p>Secure branch administration & underwriting console</p>
         </div>
 
-        <div>
-          <label htmlFor="password">Password</label>
-          <input
-            type="password"
-            id="password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            autoComplete="current-password"
-          />
-        </div>
+        {error && <div className="staff-auth-error">{error}</div>}
 
-        <button type="submit" disabled={loading}>
-          {loading ? "Authenticating..." : "Login"}
-        </button>
-      </form>
+        <form onSubmit={handleSubmit} className="staff-auth-form">
+          <div className="staff-input-group">
+            <label htmlFor="username">Staff Username</label>
+            <div className="staff-input-field">
+              <FaUser className="staff-field-icon" />
+              <input
+                type="text"
+                id="username"
+                value={formData.username}
+                onChange={handleChange}
+                required
+                autoComplete="username"
+                placeholder="Enter staff ID / username"
+              />
+            </div>
+          </div>
+
+          <div className="staff-input-group">
+            <label htmlFor="password">Security Password</label>
+            <div className="staff-input-field">
+              <FaLock className="staff-field-icon" />
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                autoComplete="current-password"
+                placeholder="Enter security password"
+              />
+              <button
+                type="button"
+                className="staff-pw-toggle"
+                onClick={() => setShowPassword(!showPassword)}
+                aria-label="Toggle password"
+              >
+                {showPassword ? <FaEyeSlash /> : <FaEye />}
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" className="staff-submit-btn" disabled={loading}>
+            {loading ? (
+              <span>Authenticating Credentials...</span>
+            ) : (
+              <>
+                <span>Access Staff Portal</span>
+                <FaArrowRight />
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Demo Fast Fill & Security Notice */}
+        <div className="staff-auth-footer">
+          <button type="button" onClick={handleFillDemo} className="staff-demo-btn">
+            <FaKey style={{ fontSize: "11px" }} /> Fill Demo Staff Credentials
+          </button>
+          <div className="staff-security-notice">
+            🔒 All transactions & administrative operations are cryptographically audited with timestamped logs.
+          </div>
+          <div className="staff-portal-links">
+            <Link to="/customerlogin">Customer Portal</Link> • <Link to="/adminlogin">Admin Control</Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

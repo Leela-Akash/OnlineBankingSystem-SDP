@@ -76,18 +76,18 @@ export default function AdminDashboard() {
       <div className="dashboard-header" style={{ marginBottom: "28px" }}>
         <div className="welcome-section">
           <h1 style={{ fontSize: "28px", fontWeight: 800 }}>Executive Bank Command Center</h1>
-          <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>
+          <p style={{ color: "rgba(255, 255, 255, 0.92)", fontSize: "14px" }}>
             Nexus Core Banking High-Reliability Operations & System Health
           </p>
         </div>
       </div>
 
       {/* Primary KPIs */}
-      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
+      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px", marginBottom: "20px" }}>
         <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--primary)" }}>
           <div className="stat-icon">👥</div>
           <div className="stat-content">
-            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.customerCount}</h3>
+            <h3 style={{ fontSize: "24px", fontWeight: 700 }}>{stats.customerCount}</h3>
             <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Registered Accounts</p>
             <small style={{ color: "var(--success)", fontWeight: 600 }}>{stats.activeAccounts} Active Ledgers</small>
           </div>
@@ -96,7 +96,7 @@ export default function AdminDashboard() {
         <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--success)" }}>
           <div className="stat-icon">💰</div>
           <div className="stat-content">
-            <h3 style={{ fontSize: "26px", fontWeight: 700, color: "var(--success)" }}>
+            <h3 style={{ fontSize: "clamp(18px, 1.8vw, 22px)", fontWeight: 700, color: "var(--success)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               ₹{Number(stats.totalDeposits || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </h3>
             <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Cumulative Deposits</p>
@@ -106,7 +106,7 @@ export default function AdminDashboard() {
         <div className="stat-card fintech-card" style={{ borderLeft: "4px solid var(--danger)" }}>
           <div className="stat-icon">💸</div>
           <div className="stat-content">
-            <h3 style={{ fontSize: "26px", fontWeight: 700, color: "var(--danger)" }}>
+            <h3 style={{ fontSize: "clamp(18px, 1.8vw, 22px)", fontWeight: 700, color: "var(--danger)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               ₹{Number(stats.totalWithdrawals || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </h3>
             <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Cumulative Outflow</p>
@@ -116,18 +116,18 @@ export default function AdminDashboard() {
         <div className="stat-card fintech-card" style={{ borderLeft: "4px solid #8b5cf6" }}>
           <div className="stat-icon">👔</div>
           <div className="stat-content">
-            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.staffCount}</h3>
+            <h3 style={{ fontSize: "24px", fontWeight: 700 }}>{stats.staffCount}</h3>
             <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Active Staff Personnel</p>
           </div>
         </div>
       </div>
 
       {/* Financial Health KPIs */}
-      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "32px" }}>
+      <div className="stats-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px", marginBottom: "32px" }}>
         <div className="stat-card fintech-card" style={{ borderLeft: "4px solid #f59e0b" }}>
           <div className="stat-icon">🏦</div>
           <div className="stat-content">
-            <h3 style={{ fontSize: "28px", fontWeight: 700 }}>{stats.activeLoans}</h3>
+            <h3 style={{ fontSize: "24px", fontWeight: 700 }}>{stats.activeLoans}</h3>
             <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Active Disbursed Loans</p>
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function AdminDashboard() {
         <div className="stat-card fintech-card" style={{ borderLeft: "4px solid #10b981" }}>
           <div className="stat-icon">💵</div>
           <div className="stat-content">
-            <h3 style={{ fontSize: "26px", fontWeight: 700 }}>
+            <h3 style={{ fontSize: "clamp(18px, 1.8vw, 22px)", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
               ₹{Number(stats.revenue || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
             </h3>
             <p style={{ color: "var(--text-muted)", fontSize: "13px" }}>Est. Interest Revenue</p>

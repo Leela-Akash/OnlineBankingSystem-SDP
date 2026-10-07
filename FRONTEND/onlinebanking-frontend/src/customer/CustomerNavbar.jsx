@@ -48,6 +48,9 @@ export default function CustomerNavBar() {
   // Visibility-aware polling: automatically pauses when tab is hidden, refreshes on return
   useVisibilityPolling(fetchCustomerAndUnread, 45000, Boolean(user?.id || customer?.id));
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const closeMenu = () => setMobileMenuOpen(false);
+
   const handleLogout = () => {
     logout();
     navigate("/customerlogin", { replace: true });
@@ -56,18 +59,37 @@ export default function CustomerNavBar() {
   return (
     <>
       <nav className="admin-navbar">
-        <div className="logo">
-          <NavLink to="/customer/profile" style={{ color: 'inherit', textDecoration: 'none' }}>
-            🏦 Nexus Banking
-          </NavLink>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button
+            className="mobile-hamburger-btn"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle navigation"
+            style={{
+              display: 'none',
+              background: 'none',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '20px',
+              cursor: 'pointer',
+              padding: '4px',
+            }}
+          >
+            {mobileMenuOpen ? '✕' : '☰'}
+          </button>
+
+          <div className="logo">
+            <NavLink to="/customer/profile" style={{ color: 'inherit', textDecoration: 'none' }}>
+              🏦 Nexus Banking
+            </NavLink>
+          </div>
         </div>
 
-        <div className="nav-links">
-          <NavLink to="/customer/deposit-withdraw">Deposit / Withdraw</NavLink>
-          <NavLink to="/customer/statements">Statements & Analytics</NavLink>
-          <NavLink to="/funds">Fund Transfer</NavLink>
-          <NavLink to="/loans">Loans</NavLink>
-          <NavLink to="/notifications" style={{ position: 'relative' }}>
+        <div className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+          <NavLink to="/customer/deposit-withdraw" onClick={closeMenu}>Deposit / Withdraw</NavLink>
+          <NavLink to="/customer/statements" onClick={closeMenu}>Statements & Analytics</NavLink>
+          <NavLink to="/funds" onClick={closeMenu}>Fund Transfer</NavLink>
+          <NavLink to="/loans" onClick={closeMenu}>Loans</NavLink>
+          <NavLink to="/notifications" onClick={closeMenu} style={{ position: 'relative' }}>
             <FaBell style={{ marginRight: '4px' }} />
             Notifications
             {unreadCount > 0 && <span className="notification-badge">{unreadCount}</span>}

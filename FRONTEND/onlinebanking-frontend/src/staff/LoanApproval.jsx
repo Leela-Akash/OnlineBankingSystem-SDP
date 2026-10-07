@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { FaCheckCircle, FaTimesCircle, FaMoneyCheckAlt, FaCalendarAlt, FaPercentage, FaUserCheck, FaExclamationTriangle } from 'react-icons/fa';
 import apiClient from '../utils/axiosConfig';
 import { useToast } from '../components/Toast';
 import { useVisibilityPolling } from '../utils/useVisibilityPolling';
@@ -11,6 +12,11 @@ export default function LoanApproval() {
   const [activeTab, setActiveTab] = useState('pending');
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState(null);
+  
+  // Rejection modal state
+  const [rejectModalLoan, setRejectModalLoan] = useState(null);
+  const [rejectReason, setRejectReason] = useState('Credit score below underwriting criteria');
+
   const { addToast } = useToast();
 
   const fetchLoans = useCallback(async () => {
@@ -49,16 +55,21 @@ export default function LoanApproval() {
     }
   };
 
-  const handleReject = async (loanId) => {
-    const reason = window.prompt('Specify underwriting rejection reason:', 'Credit score threshold not met');
-    if (!reason) return;
+  const handleOpenReject = (loan) => {
+    setRejectModalLoan(loan);
+    setRejectReason('Credit score below underwriting criteria');
+  };
 
+  const handleConfirmReject = async () => {
+    if (!rejectModalLoan) return;
+    const loanId = rejectModalLoan.id;
     setProcessingId(loanId);
     try {
       await apiClient.put(`/loan/reject/${loanId}`, {
-        comments: reason,
+        comments: rejectReason || 'Application rejected by underwriting committee',
       });
       addToast('Loan application rejected', 'info');
+      setRejectModalLoan(null);
       fetchLoans();
     } catch (error) {
       addToast(error.response?.data?.error || 'Failed to reject loan', 'error');
@@ -82,9 +93,10 @@ export default function LoanApproval() {
 
   const getStatusBadge = (status) => {
     const s = (status || '').toLowerCase();
-    if (s === 'approved' || s === 'disbursed') return <span className="badge-active">{status}</span>;
-    if (s === 'rejected') return <span className="badge-inactive">{status}</span>;
-    return <span style={{ backgroundColor: '#fef3c7', color: '#92400e', padding: '4px 8px', borderRadius: '9999px', fontSize: '12px', fontWeight: 600 }}>{status}</span>;
+    if (s === 'approved') return <span className="loan-badge badge-approved">Approved</span>;
+    if (s === 'disbursed' || s === 'active') return <span className="loan-badge badge-disbursed">Disbursed</span>;
+    if (s === 'rejected') return <span className="loan-badge badge-rejected">Rejected</span>;
+    return <span className="loan-badge badge-pending">Pending Review</span>;
   };
 
   if (loading) {
@@ -99,118 +111,97 @@ export default function LoanApproval() {
   const displayedLoans = activeTab === 'pending' ? pendingLoans : allLoans;
 
   return (
-    <div className="loan-approval-container" style={{ maxWidth: '1100px', margin: '20px auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+    <div className="loan-approval-page">
+      <div className="loan-page-header">
         <div>
-          <h2 style={{ fontSize: '26px', fontWeight: 700 }}>📋 Loan Underwriting & Disbursement</h2>
-          <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-            Underwrite pending loan applications or disburse capital to borrowers
-          </p>
+          <h2>Loan Underwriting & Capital Disbursement</h2>
+          <p>Adjudicate borrower applications and disburse approved loan capital directly to ledgers</p>
         </div>
 
         {/* Tab Controls */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div className="loan-tab-pills">
           <button
             onClick={() => setActiveTab('pending')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
-              border: '1px solid var(--border-color)',
-              backgroundColor: activeTab === 'pending' ? 'var(--primary)' : 'var(--bg-card)',
-              color: activeTab === 'pending' ? '#fff' : 'var(--text-main)',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className={`loan-tab-btn ${activeTab === 'pending' ? 'active' : ''}`}
           >
             Pending Review ({pendingLoans.length})
           </button>
           <button
             onClick={() => setActiveTab('all')}
-            style={{
-              padding: '8px 16px',
-              borderRadius: '6px',
-              border: '1px solid var(--border-color)',
-              backgroundColor: activeTab === 'all' ? 'var(--primary)' : 'var(--bg-card)',
-              color: activeTab === 'all' ? '#fff' : 'var(--text-main)',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
+            className={`loan-tab-btn ${activeTab === 'all' ? 'active' : ''}`}
           >
             All Loans ({allLoans.length})
           </button>
         </div>
       </div>
 
-      <div className="fintech-card">
+      <div className="fintech-card loan-card-table-wrapper">
         {displayedLoans.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-            No {activeTab === 'pending' ? 'pending' : ''} loans found.
+          <div className="loan-empty-state">
+            <FaCheckCircle className="empty-icon" />
+            <h3>No {activeTab === 'pending' ? 'Pending' : ''} Loans Found</h3>
+            <p>All loan applications for this view have been processed.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '14px' }}>
+          <div className="table-responsive">
+            <table className="loan-fintech-table">
               <thead>
-                <tr style={{ borderBottom: '2px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '12px 8px' }}>ID</th>
-                  <th style={{ padding: '12px 8px' }}>Borrower</th>
-                  <th style={{ padding: '12px 8px' }}>Type</th>
-                  <th style={{ padding: '12px 8px' }}>Principal</th>
-                  <th style={{ padding: '12px 8px' }}>Tenure</th>
-                  <th style={{ padding: '12px 8px' }}>Status</th>
-                  <th style={{ padding: '12px 8px', textAlign: 'right' }}>Actions</th>
+                <tr>
+                  <th>Application</th>
+                  <th>Borrower Details</th>
+                  <th>Loan Product</th>
+                  <th>Principal Amount</th>
+                  <th>Tenure & Rate</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Underwriting Action</th>
                 </tr>
               </thead>
               <tbody>
                 {displayedLoans.map((loan) => (
-                  <tr key={loan.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '12px 8px', fontFamily: 'monospace' }}>#{loan.id}</td>
-                    <td style={{ padding: '12px 8px' }}>
-                      <div style={{ fontWeight: 600 }}>{loan.customer?.fullName || 'Customer #' + (loan.customer?.id || 'N/A')}</div>
-                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                        Acc #{loan.customer?.accountNumber || 'Pending'}
-                      </span>
+                  <tr key={loan.id}>
+                    <td>
+                      <span className="loan-app-id">#{loan.id}</span>
+                      <div className="loan-app-date">{loan.requestDate || 'Recent'}</div>
                     </td>
-                    <td style={{ padding: '12px 8px' }}>{loan.loanType}</td>
-                    <td style={{ padding: '12px 8px', fontWeight: 700, color: 'var(--primary)' }}>
-                      ₹{Number(loan.loanAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    <td>
+                      <div className="borrower-name">{loan.customer?.fullName || 'Customer #' + (loan.customer?.id || 'N/A')}</div>
+                      <div className="borrower-acc">Acc: {loan.customer?.accountNumber || 'Pending'}</div>
                     </td>
-                    <td style={{ padding: '12px 8px' }}>{loan.tenureMonths} mos</td>
-                    <td style={{ padding: '12px 8px' }}>{getStatusBadge(loan.status)}</td>
-                    <td style={{ padding: '12px 8px', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                    <td>
+                      <span className="product-chip">{loan.loanType}</span>
+                      {loan.purpose && <div className="product-purpose">{loan.purpose}</div>}
+                    </td>
+                    <td>
+                      <div className="loan-principal">
+                        ₹{Number(loan.loanAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="loan-terms">
+                        <span><FaCalendarAlt style={{ fontSize: '11px' }} /> {loan.tenureMonths} Mo</span>
+                        <span><FaPercentage style={{ fontSize: '11px' }} /> {loan.interestRate || '10.5'}%</span>
+                      </div>
+                    </td>
+                    <td>{getStatusBadge(loan.status)}</td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div className="action-button-group">
                         {loan.status?.toLowerCase() === 'pending' && (
                           <>
                             <button
                               onClick={() => handleApprove(loan.id)}
                               disabled={processingId === loan.id}
-                              style={{
-                                backgroundColor: 'var(--success)',
-                                color: '#fff',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                              }}
+                              className="btn-approve"
+                              title="Approve loan application"
                             >
-                              Approve
+                              <FaCheckCircle /> Approve
                             </button>
                             <button
-                              onClick={() => handleReject(loan.id)}
+                              onClick={() => handleOpenReject(loan)}
                               disabled={processingId === loan.id}
-                              style={{
-                                backgroundColor: 'var(--danger)',
-                                color: '#fff',
-                                padding: '6px 12px',
-                                borderRadius: '6px',
-                                border: 'none',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                              }}
+                              className="btn-reject"
+                              title="Reject loan application"
                             >
-                              Reject
+                              <FaTimesCircle /> Reject
                             </button>
                           </>
                         )}
@@ -219,11 +210,17 @@ export default function LoanApproval() {
                           <button
                             onClick={() => handleDisburse(loan.id)}
                             disabled={processingId === loan.id}
-                            className="fintech-btn-primary"
-                            style={{ padding: '6px 12px', fontSize: '12px' }}
+                            className="btn-disburse"
                           >
-                            💸 Disburse Funds
+                            <FaMoneyCheckAlt /> Disburse
                           </button>
+                        )}
+
+                        {(loan.status?.toLowerCase() === 'disbursed' || loan.status?.toLowerCase() === 'active') && (
+                          <span className="disbursed-tag">✓ Capital Disbursed</span>
+                        )}
+                        {loan.status?.toLowerCase() === 'rejected' && (
+                          <span className="rejected-tag">Declined</span>
                         )}
                       </div>
                     </td>
@@ -234,6 +231,60 @@ export default function LoanApproval() {
           </div>
         )}
       </div>
+
+      {/* Reject Reason Modal */}
+      {rejectModalLoan && (
+        <div className="modal-backdrop">
+          <div className="fintech-card modal-content-box">
+            <div className="modal-header">
+              <FaExclamationTriangle style={{ color: '#ef4444', fontSize: '20px' }} />
+              <h3>Decline Loan #{rejectModalLoan.id}</h3>
+            </div>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '14px' }}>
+              Select an underwriting reason to record in the audit log for borrower {rejectModalLoan.customer?.fullName}:
+            </p>
+
+            <div className="modal-reasons">
+              <label>
+                <input
+                  type="radio"
+                  name="reason"
+                  checked={rejectReason === 'Credit score below underwriting criteria'}
+                  onChange={() => setRejectReason('Credit score below underwriting criteria')}
+                />
+                Credit score below threshold
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="reason"
+                  checked={rejectReason === 'Insufficient debt-to-income ratio'}
+                  onChange={() => setRejectReason('Insufficient debt-to-income ratio')}
+                />
+                Insufficient debt-to-income ratio
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="reason"
+                  checked={rejectReason === 'Incomplete financial disclosures'}
+                  onChange={() => setRejectReason('Incomplete financial disclosures')}
+                />
+                Incomplete financial disclosures
+              </label>
+            </div>
+
+            <div className="modal-footer">
+              <button onClick={() => setRejectModalLoan(null)} className="btn-modal-cancel">
+                Cancel
+              </button>
+              <button onClick={handleConfirmReject} className="btn-modal-confirm">
+                Confirm Decline
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

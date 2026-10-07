@@ -1,69 +1,54 @@
-/* ViewAllCustomers.css */
+/* ==========================================================================
+   Nexus Banking - Staff View All Customers Styling
+   ========================================================================== */
 
 .view-customers-container {
-  padding: 20px;
-  font-family: Arial, sans-serif;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-  margin: 20px auto;
-  max-width: 1200px;
+  padding: 28px;
+  max-width: 1240px;
+  margin: 0 auto;
 }
 
-.view-customers-title {
-  text-align: center;
-  margin-bottom: 20px;
-  font-size: 24px;
-  color: #333;
-}
-
-.filters {
-  margin-bottom: 15px;
-  text-align: center;
-}
-
-.filters input {
-  width: 300px;
-  padding: 10px 12px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-  font-size: 14px;
-}
-
-.view-customers-table {
+.view-customers-container table {
   width: 100%;
   border-collapse: collapse;
-  background-color: #fff;
-  border-radius: 6px;
-  overflow: hidden;
+  font-size: 13px;
 }
 
-.view-customers-table th,
-.view-customers-table td {
-  border: 1px solid #ddd;
-  padding: 10px;
-  text-align: center;
+.view-customers-container thead th {
+  padding: 14px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  background: transparent;
 }
 
-.view-customers-table th {
-  background-color: #007bff;
-  color: white;
-  font-weight: 600;
+.view-customers-container tbody td {
+  padding: 14px 12px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-main);
+  vertical-align: middle;
 }
 
-.view-customers-table tr:nth-child(even) {
-  background-color: #f2f2f2;
+.view-customers-container tbody tr {
+  transition: background-color 0.15s ease;
 }
 
-.view-customers-table tr:hover {
-  background-color: #e6f0ff;
+.view-customers-container tbody tr:hover {
+  background-color: rgba(37, 99, 235, 0.03);
 }
 
-.table-error,
-.table-loading,
-.table-empty {
-  text-align: center;
-  margin-top: 20px;
-  font-size: 16px;
-  color: red;
+.view-customers-container input,
+.view-customers-container select {
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.view-customers-container input:focus,
+.view-customers-container select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
 }
