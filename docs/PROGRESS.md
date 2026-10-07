@@ -57,10 +57,10 @@
 - [x] Build and test verification, git commit: `phase-6: frontend modernization`.
 
 ## Phase 7: Repository and Documentation
-- [ ] Remove `BACKEND/.metadata` from git and create comprehensive `.gitignore`.
-- [ ] Professional `README.md` with architecture diagram (Mermaid), features, security design, local setup, demo credentials, and design decisions.
-- [ ] `.env.example` files for backend and frontend without committed secrets.
-- [ ] Build and test verification, git commit: `phase-7: repo and docs`.
+- [x] Remove `BACKEND/.metadata` from git and create comprehensive `.gitignore`.
+- [x] Professional `README.md` with architecture diagram (Mermaid), features, security design, local setup, demo credentials, and design decisions.
+- [x] `.env.example` files for backend and frontend without committed secrets.
+- [x] Build and test verification, git commit: `phase-7: repo and docs`.
 
 ## Phase 8: Deployment Readiness
 - [ ] Cloud deployment readiness for backend (Render/Railway Dockerfile reading env vars).

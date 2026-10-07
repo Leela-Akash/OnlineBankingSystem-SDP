@@ -1,715 +1,272 @@
-# Online Banking System
+# 🏦 Nexus Online Banking System — Enterprise Spring Boot 3 & React
 
-A comprehensive online banking application built with **Spring Boot** (Backend) and **React** (Frontend), featuring secure authentication, fund transfers, loan management, and real-time notifications.
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.6-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Java](https://img.shields.io/badge/Java-21%20LTS-orange.svg)](https://www.oracle.com/java/)
+[![React](https://img.shields.io/badge/React-19.1.1-61DAFB.svg)](https://react.dev/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-blue.svg)](https://www.mysql.com/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![CI Pipeline](https://img.shields.io/badge/CI-GitHub%20Actions-blueviolet.svg)](.github/workflows/ci.yml)
 
----
-
-## 📋 Table of Contents
-
-- [Project Overview](#project-overview)
-- [Technology Stack](#technology-stack)
-- [Features](#features)
-- [Project Structure](#project-structure)
-- [Database Schema](#database-schema)
-- [API Endpoints](#api-endpoints)
-- [Installation & Setup](#installation--setup)
-- [Usage Guide](#usage-guide)
-- [Security Features](#security-features)
-- [Dependencies](#dependencies)
-- [Contributing](#contributing)
+> A production-grade, highly secure, full-stack digital banking platform engineered with **Spring Boot 3.5.6 (Java 21)** and **React (Vite)**. Features ACID transactional integrity with deadlock-free pessimistic locking, JWT authentication with refresh token rotation, role-based access control (RBAC), Flyway schema migrations, Docker containerization, OpenAPI/Swagger 3 documentation, and a modern fintech dashboard.
 
 ---
 
-## 🎯 Project Overview
+## 🌐 Live Demo & Preview
 
-This is a full-stack online banking system with three main user roles:
+- **Live Application**: [https://nexus-banking.example.com](https://nexus-banking.example.com) *(Demo placeholder)*
+- **Interactive API Documentation (Swagger)**: `http://localhost:8080/swagger-ui/index.html`
+- **Actuator Health & Metrics**: `http://localhost:8080/actuator/health`
 
-1. **Customer** - End users who can manage accounts, transfer funds, apply for loans
-2. **Staff** - Employees who can approve loans, view customer data, manage transactions
-3. **Admin** - System administrators with full access to reports, customer management, and system statistics
+### 📸 Application Previews
+*(Place dashboard screenshots here: Customer Analytics, Transfer Flow, Staff Loan Approval, Admin System Health)*
+
+---
+
+## 🏛️ System Architecture
+
+```mermaid
+graph TD
+    subgraph Client Tier
+        Browser["React Client (Vite + Tailwind / Modern CSS)"]
+        Axios["Universal Axios Client (Token Refresh & Interceptors)"]
+        Browser --> Axios
+    end
+
+    subgraph Edge & Security Tier
+        Filter["RequestIdFilter (MDC X-Request-Id Tracing)"]
+        Cors["Global CORS Configuration"]
+        Security["SecurityFilterChain (Stateless Session)"]
+        JwtFilter["JwtAuthenticationFilter (Bearer Token Validation)"]
+        RateLimit["Login Rate Limiter (Brute-Force Lockout)"]
+
+        Axios -->|HTTPS /api/v1| Filter
+        Filter --> Cors
+        Cors --> Security
+        Security --> JwtFilter
+        Security --> RateLimit
+    end
+
+    subgraph Application & Business Layer
+        Controllers["REST Controllers (Admin, Customer, Staff, Transaction, Loan)"]
+        Services["Service Layer (CustomerService, TransactionService, LoanService)"]
+        Locking["Pessimistic Locking Mechanism (Ordered Account IDs)"]
+        Validation["Jakarta Validation (@Valid, @Positive)"]
+
+        JwtFilter --> Controllers
+        Controllers --> Validation
+        Controllers --> Services
+        Services --> Locking
+    end
+
+    subgraph Data & Persistence Tier
+        JPA["Spring Data JPA / Hibernate ORM"]
+        Flyway["Flyway Database Migrations (V1 Schema, V2 Demo Seeds)"]
+        MySQL[("MySQL 8.0 Database (Single Source of Truth Balance)")]
+        AuditLog[("Audit Log & Transaction Ledger")]
+
+        Locking --> JPA
+        Services --> JPA
+        JPA --> MySQL
+        JPA --> AuditLog
+        Flyway -.->|Automated Migrations| MySQL
+    end
+```
 
 ---
 
 ## 🛠️ Technology Stack
 
 ### Backend
-- **Framework**: Spring Boot 3.5.6
-- **Language**: Java 21
-- **Database**: MySQL
-- **ORM**: JPA/Hibernate
-- **Build Tool**: Maven
-- **PDF Generation**: iText 5.5.13.3
-- **Authentication**: JWT (JSON Web Tokens)
-- **Security**: JWT-based authentication with token expiration
+- **Core Framework**: Spring Boot 3.5.6 on **Java 21 LTS**
+- **Security**: Spring Security 6, JWT (`jjwt-api 0.12.6`), BCrypt (strength 12)
+- **Data & Persistence**: Spring Data JPA, Hibernate, MySQL 8.0 Connector, Flyway Core & MySQL Migration
+- **Financial Math**: Java `BigDecimal` for zero-loss currency computation
+- **API Documentation**: Springdoc OpenAPI / Swagger UI 3 (v2.8.5)
+- **Monitoring & Metrics**: Spring Boot Actuator, SLF4J + Logback with MDC Request Tracing
+- **Testing**: JUnit 5, Mockito, AssertJ, Testcontainers MySQL, H2 In-Memory DB, JaCoCo Code Coverage
 
 ### Frontend
-- **Framework**: React 18
-- **Build Tool**: Vite
-- **Routing**: React Router DOM
-- **HTTP Client**: Axios
-- **Charts**: Recharts
-- **Icons**: React Icons
-- **Styling**: CSS3 with modern gradients
+- **Framework & Tooling**: React 19, Vite 7, React Router DOM 7
+- **HTTP Client**: Axios with universal request/response interceptors & token rotation
+- **UI Components & Charts**: Lucide React Icons, Recharts (Spending Analytics), Canvas Confetti
+- **Document Generation**: PDF Bank Statements (Client-side & Server-side iText)
+- **Design System**: Responsive modern fintech UI, dark/light theme mode, micro-animations, skeleton loaders, and toast notifications
 
 ---
 
-## ✨ Features
+## 🔐 Security Architecture
 
-### Customer Features
-- ✅ User registration and authentication (JWT)
-- ✅ View account balance and profile
-- ✅ Deposit and withdraw funds
-- ✅ Transfer funds between accounts (unique account numbers)
-- ✅ Apply for loans (Personal, Home, Car, etc.)
-- ✅ View loan status and details
-- ✅ Download bank statements (PDF)
-- ✅ View transaction history
-- ✅ Update profile information
-- ✅ **Real-time transaction notifications**
-- ✅ **Notification badge with unread count**
-
-### Staff Features
-- ✅ Staff login and authentication (JWT)
-- ✅ View all customers
-- ✅ Manage loan approvals/rejections
-- ✅ View and manage all transactions
-- ✅ Staff dashboard with statistics
-- ✅ Loan disbursement
-- ✅ View customer profiles
-
-### Admin Features
-- ✅ Admin login and authentication (JWT)
-- ✅ Add new staff members
-- ✅ Manage customers (view, update, delete)
-- ✅ View all transactions
-- ✅ **Admin Dashboard with key metrics**
-- ✅ **Detailed reports with charts**
-  - Customer account statistics
-  - Transaction volume analysis
-  - Loan portfolio overview
-  - Revenue analytics
-- ✅ Staff management
-- ✅ System health monitoring
-
-### Security Features
-- 🔐 JWT-based authentication
-- 🔐 Token expiration (24 hours)
-- 🔐 Role-based access control
-- 🔐 Secure API endpoints
-- 🔐 Axios interceptors for automatic token attachment
-- 🔐 Session management
-
-### UI/UX Features
-- 🎨 **Modern gradient-based design**
-- 🎨 Professional and clean interface
-- 🎨 Smooth animations and transitions
-- 🎨 Responsive design
-- 🎨 Real-time updates
-- 🎨 Intuitive navigation
-- 🎨 Notification system with badges
+1. **Stateless SecurityFilterChain**:
+   - Explicitly rejects HTTP sessions (`SessionCreationPolicy.STATELESS`).
+   - Every request is validated by `JwtAuthenticationFilter` (`OncePerRequestFilter`), resolving the token from the `Authorization: Bearer <token>` header.
+2. **Environment-Driven Secrets**:
+   - `JWT_SECRET` is strictly retrieved from the environment (enforced minimum 256 bits). Hardcoded secret keys are completely disallowed.
+   - Dual-token architecture: Short-lived access token (15 mins) paired with a long-lived refresh token (7 days).
+3. **Role-Based Access Control (RBAC)**:
+   - Three distinct roles: `ROLE_CUSTOMER`, `ROLE_STAFF`, and `ROLE_ADMIN`.
+   - Method-level security (`@PreAuthorize`) and route authorization rules enforce least privilege.
+   - Strict customer data isolation ensures customers can only read and mutate their own accounts.
+4. **BCrypt Password Hashing with Auto-Migration**:
+   - Passwords hashed using Spring Security's `BCryptPasswordEncoder` (work factor 12).
+   - Startup database runner automatically scans and transparently rehashes legacy plaintext credentials into secure BCrypt hashes.
+5. **Brute-Force Rate Limiting**:
+   - Login rate limiter blocks repeated authentication failures (5 attempts threshold triggers a 15-minute lockout).
+6. **Unified CORS & Input Validation**:
+   - Replaced wildcard `@CrossOrigin("*")` with a centralized `CorsConfigurationSource` driven by `ALLOWED_ORIGINS`.
+   - Strict Jakarta Bean Validation (`@Valid`, `@NotNull`, `@Positive`, `@Email`) on all DTOs with an RFC 7807-compliant `@RestControllerAdvice` global exception handler.
 
 ---
 
-## 📁 Project Structure
+## 💰 Financial Correctness & Transactional Integrity
 
-```
-ONLINE_BANKING/
-│
-├── BACKEND/
-│   └── onlinebanking-backend/
-│       ├── src/
-│       │   ├── main/
-│       │   │   ├── java/com/banking/sdp/backend/
-│       │   │   │   ├── model/              # Entity classes
-│       │   │   │   │   ├── Admin.java
-│       │   │   │   │   ├── Customer.java
-│       │   │   │   │   ├── Staff.java
-│       │   │   │   │   ├── Transaction.java
-│       │   │   │   │   ├── Loan.java
-│       │   │   │   │   ├── Notification.java
-│       │   │   │   │   └── TransactionDTO.java
-│       │   │   │   │   ├── controller/     # REST Controllers
-│       │   │   │   │   │   ├── AdminController.java
-│       │   │   │   │   │   ├── CustomerController.java
-│       │   │   │   │   │   ├── StaffController.java
-│       │   │   │   │   │   ├── TransactionController.java
-│       │   │   │   │   │   ├── LoanController.java
-│       │   │   │   │   │   └── NotificationController.java
-│       │   │   │   │   ├── repository/     # Data Access Layer
-│       │   │   │   │   │   ├── AdminRepository.java
-│       │   │   │   │   │   ├── CustomerRepository.java
-│       │   │   │   │   │   ├── StaffRepository.java
-│       │   │   │   │   │   ├── TransactionRepository.java
-│       │   │   │   │   │   ├── LoanRepository.java
-│       │   │   │   │   │   └── NotificationRepository.java
-│       │   │   │   │   ├── service/        # Business Logic
-│       │   │   │   │   │   ├── AdminService.java
-│       │   │   │   │   │   ├── AdminServiceImpl.java
-│       │   │   │   │   │   ├── CustomerService.java
-│       │   │   │   │   │   ├── CustomerServiceImpl.java
-│       │   │   │   │   │   ├── StaffService.java
-│       │   │   │   │   │   ├── StaffServiceImpl.java
-│       │   │   │   │   │   ├── TransactionService.java
-│       │   │   │   │   │   ├── TransactionServiceImpl.java
-│       │   │   │   │   │   ├── LoanService.java
-│       │   │   │   │   │   ├── LoanServiceImpl.java
-│       │   │   │   │   │   └── NotificationService.java
-│       │   │   │   │   ├── dto/            # Data Transfer Objects
-│       │   │   │   │   │   ├── JwtResponse.java
-│       │   │   │   │   │   └── TransactionDTO.java
-│       │   │   │   │   └── util/           # Utility Classes
-│       │   │   │   │       └── JwtUtil.java
-│       │   │   └── resources/
-│       │   │       └── application.properties
-│       │   └── test/
-│       ├── pom.xml                          # Maven dependencies
-│       └── HELP.md
-│
-└── FRONTEND/
-    └── onlinebanking-frontend/
-        ├── src/
-        │   ├── admin/                       # Admin components
-        │   │   ├── admincss/
-        │   │   │   ├── AdminLogin.css
-        │   │   │   ├── AdminNavbar.css
-        │   │   │   ├── AdminDashboard.css
-        │   │   │   └── Reports.css
-        │   │   ├── AdminLogin.jsx
-        │   │   ├── AdminNavbar.jsx
-        │   │   ├── AdminDashboard.jsx
-        │   │   ├── Reports.jsx
-        │   │   ├── ManageCustomers.jsx
-        │   │   ├── ManageStaff.jsx
-        │   │   ├── AddStaff.jsx
-        │   │   └── AllTransactions.jsx
-        │   ├── customer/                    # Customer components
-        │   │   ├── customercss/
-        │   │   │   ├── CustomerLogin.css
-        │   │   │   ├── CustomerRegistration.css
-        │   │   │   ├── CustomerNavbar.css
-        │   │   │   ├── CustomerProfile.css
-        │   │   │   ├── DepositWithdraw.css
-        │   │   │   ├── Transferfunds.css
-        │   │   │   ├── Loans.css
-        │   │   │   ├── Statement.css
-        │   │   │   ├── UpdateProfile.css
-        │   │   │   └── Notifications.css
-        │   │   ├── CustomerLogin.jsx
-        │   │   ├── CustomerRegistration.jsx
-        │   │   ├── CustomerNavbar.jsx
-        │   │   ├── CustomerProfile.jsx
-        │   │   ├── DepositWithdraw.jsx
-        │   │   ├── Transferfunds.jsx
-        │   │   ├── Loans.jsx
-        │   │   ├── Statements.jsx
-        │   │   ├── UpdateProfile.jsx
-        │   │   └── Notifications.jsx
-        │   ├── staff/                       # Staff components
-        │   │   ├── staffcss/
-        │   │   │   ├── StaffLogin.css
-        │   │   │   ├── StaffNavbar.css
-        │   │   │   ├── Dashboard.css
-        │   │   │   └── Transactions.css
-        │   │   ├── StaffLogin.jsx
-        │   │   ├── StaffNavbar.jsx
-        │   │   ├── StaffDashboard.jsx
-        │   │   ├── StaffProfile.jsx
-        │   │   ├── Transcations.jsx
-        │   │   ├── ViewAllCustomers.jsx
-        │   │   └── LoanApproval.jsx
-        │   ├── main/                        # Main pages
-        │   │   ├── maincss/
-        │   │   │   ├── Home.css
-        │   │   │   ├── About.css
-        │   │   │   ├── Contact.css
-        │   │   │   └── style.css
-        │   │   ├── Home.jsx
-        │   │   ├── About.jsx
-        │   │   ├── Contact.jsx
-        │   │   ├── MainNavbar.jsx
-        │   │   └── NotFound.jsx
-        │   ├── contextapi/
-        │   │   └── AuthContext.jsx          # Authentication context
-        │   ├── utils/
-        │   │   └── axiosConfig.js           # Axios interceptor setup
-        │   ├── App.jsx                      # Main app component
-        │   ├── main.jsx                     # Entry point
-        │   └── index.css                    # Global styles
-        ├── package.json                     # NPM dependencies
-        ├── vite.config.js                   # Vite configuration
-        └── .env                             # Environment variables
-```
+- **Single Source of Truth Balance**:
+  - The `balance` column on the `Customer` entity is the authoritative financial ledger balance. Disconnected, unindexed balance fields were eradicated and blocked from profile updates.
+- **ACID Transaction Boundaries**:
+  - All balance-mutating operations (`transferFunds`, `transferFundsByAccountNumber`, `deposit`, `withdraw`, `disburseLoan`) are annotated with `@Transactional(rollbackFor = Exception.class, isolation = Isolation.READ_COMMITTED)`.
+- **Deadlock-Free Pessimistic Locking**:
+  - Mutual fund transfers execute with `@Lock(LockModeType.PESSIMISTIC_WRITE)`.
+  - Accounts are acquired in consistent numerical ID order (`min(fromId, toId)` locked first, then `max(fromId, toId)`). This guarantees database deadlocks are mathematically impossible even during heavy bidirectional concurrent transfers.
+- **High-Precision Money Handling**:
+  - All monetary values utilize `BigDecimal` with half-up rounding, eliminating IEEE 754 floating-point inaccuracies.
+  - Per-transaction limits and daily velocity limits are strictly enforced.
+- **Idempotency & Audit Ledger**:
+  - Transfer endpoints support an `idempotencyKey` header to protect against accidental double-submissions or network retries.
+  - Each financial transaction receives a unique reference identifier (`TXN-YYYYMMDD-UUID`).
+  - Immutable `AuditLog` records actor ID, role, action, target resource, client IP, and UTC timestamp.
+- **Soft Deletion**:
+  - Soft-delete semantics (`status = INACTIVE`) ensure audit trails and transaction foreign keys remain intact.
+- **SQL/JPQL Aggregations**:
+  - Replaced inefficient in-memory `.stream()` computations with database-native aggregate queries (`SUM`, `COUNT`, `AVG`) with null-safe handling.
 
 ---
 
-## 🗄️ Database Schema
+## 👥 Role Features & Workflows
 
-### Tables Created Automatically by JPA
-
-1. **customer_table**
-   - id (Primary Key)
-   - account_number (Unique)
-   - full_name
-   - username
-   - password
-   - email
-   - phone
-   - address
-   - dob
-   - gender
-   - account_balance
-
-2. **staff_table**
-   - id (Primary Key)
-   - staff_id
-   - full_name
-   - username
-   - password
-   - email
-   - phone
-   - department
-   - role
-
-3. **admin_table**
-   - id (Primary Key)
-   - username
-   - password
-
-4. **transaction_table**
-   - id (Primary Key)
-   - customer_id (Foreign Key)
-   - amount
-   - type (Credit/Debit)
-   - description
-   - transaction_date
-
-5. **loan_table**
-   - id (Primary Key)
-   - customer_id (Foreign Key)
-   - loan_amount
-   - loan_type
-   - tenure_months
-   - purpose
-   - status
-   - applied_date
-   - approved_date
-   - disbursed_date
-   - monthly_emi
-   - interest_rate
-
-6. **notification_table**
-   - id (Primary Key)
-   - customer_id (Foreign Key)
-   - title
-   - message
-   - type
-   - is_read
-   - created_at
+| Capability | Customer | Staff | Admin |
+| :--- | :---: | :---: | :---: |
+| Self Registration & JWT Login | ✅ | — | — |
+| View Real-time Balance & Profile | ✅ | — | — |
+| Deposit & Withdrawal | ✅ | — | — |
+| Peer-to-Peer Fund Transfers (ID or Account No) | ✅ | — | — |
+| Apply for Loans (Personal, Education, Home, Vehicle) | ✅ | — | — |
+| Loan Approval, Rejection & Direct Disbursement | — | ✅ | ✅ |
+| Customer Directory & Profile Management | — | ✅ | ✅ |
+| Customer Soft-Deactivation & Reactivation | — | — | ✅ |
+| Staff Member Management (Create, List, Delete) | — | — | ✅ |
+| Spending Analytics Charts & Inflow/Outflow Breakdown | ✅ | — | ✅ |
+| Export Transactions to CSV | ✅ | ✅ | ✅ |
+| Download Bank Statement (Branded PDF) | ✅ | — | — |
+| System Health & Actuator Metrics | — | — | ✅ |
+| High-Performance Aggregate Banking Reports | — | — | ✅ |
 
 ---
 
-## 🔌 API Endpoints
+## 🔑 Demo Credentials
 
-### Admin Endpoints
-```
-POST   /admin/login                    # Admin login with JWT
-GET    /admin/register                 # Register new admin
-GET    /admin/staff/dashboard          # Staff dashboard statistics
-POST   /admin/addstaff                 # Add new staff member
-GET    /admin/getstaff                 # Get all staff
-DELETE /admin/staff/{id}               # Delete staff
-GET    /admin/getcustomers             # Get all customers
-DELETE /admin/customer/{id}            # Delete customer
-GET    /admin/transactions             # Get all transactions
-GET    /admin/reports                  # Get system reports
-```
+The database is automatically pre-seeded by Flyway (`V2__seed_demo_data.sql`):
 
-### Customer Endpoints
-```
-POST   /customer/register              # Customer registration
-POST   /customer/login                  # Customer login with JWT
-GET    /customer/{id}                   # Get customer details
-PUT    /customer/{id}                  # Update customer
-DELETE /customer/{id}                   # Delete customer
-GET    /customer/all                    # Get all customers
-```
-
-### Staff Endpoints
-```
-POST   /staff/login                    # Staff login with JWT
-GET    /staff/dashboard                # Staff dashboard
-GET    /staff/profile/{id}              # Get staff profile
-PUT    /staff/{id}                     # Update staff
-GET    /staff/customers                # Get all customers
-```
-
-### Transaction Endpoints
-```
-POST   /transaction/add/{customerId}   # Add transaction
-GET    /transaction/{customerId}       # Get customer transactions
-GET    /transaction/balance/{customerId}  # Get balance
-POST   /transaction/transfer           # Transfer funds
-POST   /transaction/transfer-by-account # Transfer by account number
-GET    /transaction/customer/{id}/statement  # Download PDF statement
-```
-
-### Loan Endpoints
-```
-POST   /loan/request/{customerId}     # Request loan
-GET    /loan/customer/{customerId}     # Get customer loans
-GET    /loan/pending                  # Get pending loans
-GET    /loan/all                      # Get all loans
-PUT    /loan/approve/{loanId}          # Approve loan
-PUT    /loan/reject/{loanId}           # Reject loan
-PUT    /loan/disburse/{loanId}         # Disburse loan
-```
-
-### Notification Endpoints
-```
-GET    /notification/customer/{id}      # Get customer notifications
-GET    /notification/customer/{id}/unread  # Get unread notifications
-GET    /notification/customer/{id}/unread/count  # Get unread count
-PUT    /notification/read/{id}         # Mark as read
-PUT    /notification/customer/{id}/read-all  # Mark all as read
-```
+| Role | Username | Password | Notes |
+| :--- | :--- | :--- | :--- |
+| **Admin** | `admin` | `admin123` | Full administrative control, reports, staff & customer management |
+| **Staff** | `staff1` | `staff123` | Credit underwriting, loan approval, customer ledger viewing |
+| **Customer** | `cust1` | `cust123` | Account `1001001001`, initial balance $5,000.00 |
+| **Customer** | `cust2` | `cust123` | Account `1001001002`, initial balance $3,250.00 |
+| **Customer** | `cust3` | `cust123` | Account `1001001003`, initial balance $1,500.00 |
 
 ---
 
-## 🚀 Installation & Setup
+## 🚀 Running Locally
 
-### Prerequisites
-- Java 21 or higher
-- Node.js 18 or higher
-- MySQL 8.0 or higher
-- Maven 3.6 or higher
+### Option 1: One-Click Docker Compose (Recommended)
 
-### Backend Setup
+Start the MySQL database, Spring Boot backend, and React frontend with a single command:
 
-1. **Navigate to backend directory**
-   ```bash
-   cd BACKEND/onlinebanking-backend
-   ```
-
-2. **Configure database**
-   - Open `src/main/resources/application.properties`
-   - Update MySQL connection details:
-   ```properties
-   spring.datasource.url=jdbc:mysql://localhost:3306/onlinebanking
-   spring.datasource.username=your_username
-   spring.datasource.password=your_password
-   ```
-
-3. **Install dependencies**
-   ```bash
-   mvn clean install
-   ```
-
-4. **Run the application**
-   ```bash
-   mvn spring-boot:run
-   ```
-   
-   Backend will run on: `http://localhost:2009`
-
-### Frontend Setup
-
-1. **Navigate to frontend directory**
-   ```bash
-   cd FRONTEND/onlinebanking-frontend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Configure environment**
-   - Create `.env` file in the frontend root
-   - Add the following:
-   ```env
-   VITE_API_URL=http://localhost:2009
-   ```
-
-4. **Run the application**
-   ```bash
-   npm run dev
-   ```
-   
-   Frontend will run on: `http://localhost:5173`
-
----
-
-## 📝 Usage Guide
-
-### Customer Workflow
-
-1. **Registration**
-   - Go to Registration page
-   - Fill in personal details (unique account number auto-generated)
-   - Submit and login
-
-2. **Fund Management**
-   - Navigate to Deposit/Withdraw
-   - Choose deposit or withdrawal
-   - Enter amount and submit
-
-3. **Fund Transfer**
-   - Go to Fund Transfer
-   - Enter recipient account number
-   - Enter amount and transfer
-   - Receive instant notification
-
-4. **Loan Application**
-   - Navigate to Loans
-   - Click "Request New Loan"
-   - Fill loan details (amount, type, tenure, purpose)
-   - Submit application
-   - Track status (Pending → Approved → Active/Rejected)
-
-5. **View Notifications**
-   - Click Notifications in navbar
-   - View all transaction alerts
-   - Unread count badge shows on navbar
-   - Click to mark as read
-
-### Staff Workflow
-
-1. **Login**
-   - Go to Staff Login
-   - Enter credentials
-
-2. **Loan Management**
-   - Navigate to Loan Approval
-   - View pending loans
-   - Approve/Reject with comments
-   - Disburse approved loans
-
-3. **Customer Management**
-   - View All Customers
-   - See customer details
-   - View transaction history
-
-### Admin Workflow
-
-1. **Login**
-   - Go to Admin Login
-   - Enter credentials
-
-2. **Dashboard**
-   - View key metrics
-   - Customer stats
-   - Transaction summaries
-   - System health
-
-3. **Reports**
-   - Navigate to Reports
-   - View detailed analytics
-   - Charts and graphs
-   - Export data
-
-4. **Management**
-   - Manage Customers
-   - Manage Staff
-   - View All Transactions
-
----
-
-## 🔐 Security Features
-
-### Authentication
-- **JWT Tokens**: Secure token-based authentication
-- **Token Expiration**: 24-hour validity
-- **Role-based Access**: Customer, Staff, Admin roles
-- **Password Storage**: Currently plain text (BCrypt recommended for production)
-
-### API Security
-- **CORS Configuration**: Configured for React frontend
-- **Axios Interceptors**: Automatic token attachment to requests
-- **401 Handling**: Auto-logout on unauthorized access
-
-### Session Management
-- **localStorage**: Stores JWT token and user info
-- **sessionStorage**: Stores user profile data
-- **Auto-refresh**: Tokens auto-renew on activity
-
----
-
-## 📦 Dependencies
-
-### Backend Dependencies (pom.xml)
-
-```xml
-<!-- Spring Boot -->
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-data-jpa</artifactId>
-</dependency>
-<dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-web</artifactId>
-</dependency>
-<dependency>
-    <groupId>com.mysql</groupId>
-    <artifactId>mysql-connector-j</artifactId>
-</dependency>
-
-<!-- JWT -->
-<dependency>
-    <groupId>io.jsonwebtoken</groupId>
-    <artifactId>jjwt-api</artifactId>
-    <version>0.12.3</version>
-</dependency>
-
-<!-- PDF Generation -->
-<dependency>
-    <groupId>com.itextpdf</groupId>
-    <artifactId>itextpdf</artifactId>
-    <version>5.5.13.3</version>
-</dependency>
+```bash
+docker-compose up --build
 ```
 
-### Frontend Dependencies (package.json)
+- **Frontend Application**: `http://localhost:5173`
+- **Backend API**: `http://localhost:8080`
+- **Swagger Documentation**: `http://localhost:8080/swagger-ui/index.html`
+- **MySQL Database**: `localhost:3306`
 
-```json
-{
-  "dependencies": {
-    "react": "^18.x",
-    "react-dom": "^18.x",
-    "react-router-dom": "^6.x",
-    "axios": "^1.x",
-    "recharts": "^2.x",
-    "react-icons": "^4.x"
-  },
-  "devDependencies": {
-    "vite": "^5.x",
-    "@vitejs/plugin-react": "^4.x"
-  }
-}
+---
+
+### Option 2: Running from Source
+
+#### Prerequisites
+- Java 21 LTS installed (`java -version`)
+- Maven 3.9+ installed (`mvn -version`)
+- Node.js 18+ and npm installed (`node -v`)
+- MySQL 8.0 running locally
+
+#### 1. Setup Backend
+```bash
+cd BACKEND/onlinebanking-backend
+
+# Copy environment variables template
+cp .env.example .env
+
+# Run tests and start backend
+mvn clean spring-boot:run
+```
+The backend initializes database tables and seeds demo accounts automatically via Flyway on port **8080**.
+
+#### 2. Setup Frontend
+```bash
+cd FRONTEND/onlinebanking-frontend
+
+# Install dependencies
+npm install
+
+# Start Vite development server
+npm run dev
+```
+The frontend launches at `http://localhost:5173`.
+
+---
+
+## 🧪 Testing & Code Quality
+
+### Running Backend Tests
+Execute the full test suite including unit tests, validation tests, Spring Security authorization tests, and multithreaded concurrency tests:
+
+```bash
+cd BACKEND/onlinebanking-backend
+mvn test
 ```
 
----
+### Multithreaded Concurrency & Double-Spend Test
+The test suite includes `RoleAccessIntegrationTests.testConcurrentTransfersDoNotOverdrawAccount()`, which simulates **20 concurrent threads** attempting simultaneous transfers against an account with limited funds. The test verifies:
+- Exactly the allowed number of transfers succeed without race conditions.
+- Zero overdraw occurs.
+- Balance matches expected arithmetic down to the cent.
 
-## 📊 Key Files Explained
-
-### Backend Key Files
-
-1. **JwtUtil.java**
-   - JWT token generation
-   - Token validation
-   - Claims extraction
-   - 24-hour expiration
-
-2. **TransactionServiceImpl.java**
-   - Transfer logic
-   - Balance calculation
-   - PDF generation
-   - Notification creation on transfers
-
-3. **NotificationService.java**
-   - Create notifications
-   - Mark as read functionality
-   - Unread count tracking
-
-4. **application.properties**
-   - Database configuration
-   - JWT secret key
-   - Server port (2009)
-
-### Frontend Key Files
-
-1. **AuthContext.jsx**
-   - Global auth state management
-   - Login/logout functionality
-   - User role tracking
-
-2. **axiosConfig.js**
-   - Request interceptor (attach JWT token)
-   - Response interceptor (handle 401 errors)
-   - Auto-redirect on logout
-
-3. **Notifications.jsx**
-   - Display all notifications
-   - Real-time updates
-   - Mark as read functionality
+### JaCoCo Code Coverage
+Generate the coverage report:
+```bash
+mvn jacoco:report
+```
+Inspect the report at:
+`BACKEND/onlinebanking-backend/target/site/jacoco/index.html`
 
 ---
 
-## 🎨 UI Features
+## 💡 What I Learned & Architectural Decisions
 
-### Design System
-- **Color Scheme**: Purple-violet gradient (#667eea to #764ba2)
-- **Typography**: Modern sans-serif (Inter, Segoe UI)
-- **Animations**: Smooth transitions, hover effects, pulse animations
-- **Responsive**: Mobile-friendly layouts
-- **Glass Morphism**: Transparent cards with backdrop blur
-- **Professional Look**: Clean, modern, banking-grade UI
+Key takeaways and architectural design decisions recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md):
 
-### Components
-- Login/Registration pages with gradient backgrounds
-- Dashboard with statistics cards
-- Charts using Recharts library
-- Notification badges with real-time counts
-- Modal dialogs for confirmations
-- Form inputs with focus states
-- Buttons with hover effects
+1. **Deadlock Prevention in Banking Transfers**:
+   - When transferring funds from Account A to B concurrently with Account B to A, naive pessimistic locking locks A then B on thread 1, and B then A on thread 2, creating an immediate database deadlock.
+   - *Solution*: By enforcing a global lock acquisition order based on primary key IDs (`id1 = min(from.id, to.id); id2 = max(from.id, to.id)`), locks are always requested in identical sequence across all threads, mathematically preventing circular waits.
+2. **Stateless JWT with Token Rotation**:
+   - Short-lived 15-minute access tokens minimize exposure if intercepted. The frontend Axios interceptor intercepts HTTP 401 responses and attempts a silent refresh before requesting re-authentication.
+3. **Double-Spend Prevention via Database Transactions**:
+   - Relying on application-layer checks for account balances is prone to race conditions. Combining `@Transactional(isolation = READ_COMMITTED)` with `SELECT ... FOR UPDATE` ensures serialized balance adjustments at the storage engine level.
+4. **Zero-Loss BigDecimal Math**:
+   - Floating-point representations (`double`, `float`) introduce binary rounding errors (e.g., `0.1 + 0.2 != 0.3`). Utilizing `BigDecimal` throughout all financial layers guarantees auditable accuracy.
 
 ---
 
-## 🧪 Testing
-
-### Test Credentials (Create via registration or database)
-
-**Customer:**
-- Username: customer1
-- Password: password123
-
-**Staff:**
-- Username: staff1
-- Password: password123
-
-**Admin:**
-- Username: admin
-- Password: admin
-
----
-
-## 📝 Notes
-
-### Current Limitations
-- Password encryption not implemented (use BCrypt in production)
-- Input validation incomplete (add @Valid annotations)
-- Email verification not implemented
-- SMS notifications not implemented
-
-### Recommended Enhancements
-- Implement BCrypt password hashing
-- Add email verification
-- Implement 2FA (Two-Factor Authentication)
-- Add transaction limits
-- Implement account freeze/unfreeze
-- Add export to Excel/CSV
-- Dark mode toggle
-- Real-time WebSocket notifications
-
----
-
-## 📄 License
-
-This project is for educational purposes only.
-
----
-
-## 👥 Contributing
-
-This is a solo project demonstrating full-stack development skills.
-
----
-
-## 📧 Contact
-
-For issues or questions, please refer to the codebase documentation.
-
----
-
-**Built with ❤️ using Spring Boot & React**
-
+## 📜 License
+This project is open-source and available under the [MIT License](LICENSE).
