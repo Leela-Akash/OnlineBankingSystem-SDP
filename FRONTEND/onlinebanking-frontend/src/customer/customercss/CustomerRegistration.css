@@ -245,7 +245,7 @@
 .reg-select,
 .input-with-icon textarea {
   width: 100%;
-  padding: 11px 14px 11px 40px;
+  padding: 12px 14px;
   font-size: 14px;
   font-family: inherit;
   color: var(--text-main);
@@ -255,6 +255,11 @@
   outline: none;
   transition: all 0.2s ease;
   box-sizing: border-box;
+}
+
+.input-with-icon input,
+.input-with-icon textarea {
+  padding-left: 42px !important;
 }
 
 .reg-select {
