@@ -5,6 +5,11 @@ import com.banking.sdp.backend.model.Customer;
 import com.banking.sdp.backend.model.Loan;
 import com.banking.sdp.backend.service.CustomerService;
 import com.banking.sdp.backend.service.LoanService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -17,7 +22,8 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/loan")
+@RequestMapping({"/api/v1/loan", "/loan"})
+@Tag(name = "Loan Management", description = "Endpoints for loan applications, review, approvals, rejections, and funds disbursement")
 public class LoanController {
 
     @Autowired
@@ -26,11 +32,17 @@ public class LoanController {
     @Autowired
     private CustomerService customerService;
 
-    // Customer: Request a loan
+    @Operation(summary = "Submit loan application", description = "Customer applies for a loan with specified amount, tenure, and purpose")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Loan application submitted"),
+            @ApiResponse(responseCode = "400", description = "Invalid loan terms or validation error"),
+            @ApiResponse(responseCode = "403", description = "Access denied"),
+            @ApiResponse(responseCode = "404", description = "Customer not found")
+    })
     @PostMapping("/request/{customerId}")
     @PreAuthorize("@securityService.isCustomerOwner(#customerId)")
     public ResponseEntity<?> requestLoan(
-            @PathVariable Long customerId,
+            @Parameter(description = "Customer ID") @PathVariable Long customerId,
             @Valid @RequestBody LoanApplicationRequest request) {
         try {
             Customer customer = customerService.getCustomerById(customerId);
@@ -56,10 +68,11 @@ public class LoanController {
         }
     }
 
-    // Customer: Get my loans
+    @Operation(summary = "Get loan applications for customer", description = "Retrieves all loan applications submitted by customer")
     @GetMapping("/customer/{customerId}")
     @PreAuthorize("@securityService.isCustomerOwner(#customerId)")
-    public ResponseEntity<List<Loan>> getCustomerLoans(@PathVariable Long customerId) {
+    public ResponseEntity<List<Loan>> getCustomerLoans(
+            @Parameter(description = "Customer ID") @PathVariable Long customerId) {
         Customer customer = customerService.getCustomerById(customerId);
         if (customer == null) {
             return ResponseEntity.notFound().build();
@@ -67,25 +80,25 @@ public class LoanController {
         return ResponseEntity.ok(loanService.getCustomerLoans(customer));
     }
 
-    // Staff / Admin: Get all pending loans
+    @Operation(summary = "Get pending loans for review (Staff / Admin)", description = "Retrieves queue of pending loan applications awaiting underwriting review")
     @GetMapping("/pending")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<List<Loan>> getPendingLoans() {
         return ResponseEntity.ok(loanService.getAllPendingLoans());
     }
 
-    // Staff / Admin: Get all loans
+    @Operation(summary = "Get all loans across bank (Staff / Admin)", description = "Retrieves comprehensive history of all banking loans")
     @GetMapping("/all")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<List<Loan>> getAllLoans() {
         return ResponseEntity.ok(loanService.getAllLoans());
     }
 
-    // Staff / Admin: Approve loan
+    @Operation(summary = "Approve loan application (Staff / Admin)", description = "Approves a pending loan application with optional underwriter comments")
     @PutMapping("/approve/{loanId}")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<?> approveLoan(
-            @PathVariable Long loanId,
+            @Parameter(description = "Loan Application ID") @PathVariable Long loanId,
             @RequestBody(required = false) Map<String, String> request) {
         try {
             String comments = (request != null && request.containsKey("comments"))
@@ -100,11 +113,11 @@ public class LoanController {
         }
     }
 
-    // Staff / Admin: Reject loan
+    @Operation(summary = "Reject loan application (Staff / Admin)", description = "Rejects a pending loan application")
     @PutMapping("/reject/{loanId}")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<?> rejectLoan(
-            @PathVariable Long loanId,
+            @Parameter(description = "Loan Application ID") @PathVariable Long loanId,
             @RequestBody(required = false) Map<String, String> request) {
         try {
             String comments = (request != null && request.containsKey("comments"))
@@ -119,10 +132,10 @@ public class LoanController {
         }
     }
 
-    // Staff / Admin: Disburse loan
+    @Operation(summary = "Disburse approved loan funds (Staff / Admin)", description = "Disburses loan amount into the borrower's account with atomic balance update and audit record")
     @PutMapping("/disburse/{loanId}")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
-    public ResponseEntity<?> disburseLoan(@PathVariable Long loanId) {
+    public ResponseEntity<?> disburseLoan(@Parameter(description = "Loan Application ID") @PathVariable Long loanId) {
         try {
             Loan disbursedLoan = loanService.disbursement(loanId);
             return ResponseEntity.ok(Map.of("message", "Loan disbursed successfully", "loan", disbursedLoan));

@@ -40,10 +40,10 @@
 - [x] Build and test verification, git commit: `phase-4: testing and ci`.
 
 ## Phase 5: API Quality
-- [ ] Springdoc OpenAPI / Swagger UI with JWT Bearer auth integration and endpoint documentation.
-- [ ] Consistent REST naming, standard HTTP status codes, and API versioning (`/api/v1`).
-- [ ] Structured logging with Request-ID (MDC / filter) propagated in logs and response headers.
-- [ ] Build and test verification, git commit: `phase-5: api quality`.
+- [x] Springdoc OpenAPI / Swagger UI with JWT Bearer auth integration and endpoint documentation.
+- [x] Consistent REST naming, standard HTTP status codes, and API versioning (`/api/v1`).
+- [x] Structured logging with Request-ID (MDC / filter) propagated in logs and response headers.
+- [x] Build and test verification, git commit: `phase-5: api quality`.
 
 ## Phase 6: Frontend Modernization
 - [ ] Universal use of `apiClient` (`axiosConfig.js`), token refresh on 401 interceptor, redirect on expiry.

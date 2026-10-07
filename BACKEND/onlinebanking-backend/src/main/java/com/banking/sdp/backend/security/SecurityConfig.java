@@ -68,9 +68,14 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/customer/login",
                                 "/customer/register",
+                                "/api/v1/customer/login",
+                                "/api/v1/customer/register",
                                 "/staff/login",
+                                "/api/v1/staff/login",
                                 "/admin/login",
+                                "/api/v1/admin/login",
                                 "/auth/**",
+                                "/api/v1/auth/**",
                                 "/actuator/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -80,25 +85,36 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // Admin-only endpoints
-                        .requestMatchers("/admin/**", "/staff/add").hasRole("ADMIN")
+                        .requestMatchers("/admin/**", "/api/v1/admin/**", "/staff/add", "/api/v1/staff/add").hasRole("ADMIN")
 
                         // Staff and Admin endpoints
                         .requestMatchers(
                                 "/staff/**",
+                                "/api/v1/staff/**",
                                 "/loan/pending",
+                                "/api/v1/loan/pending",
                                 "/loan/all",
+                                "/api/v1/loan/all",
                                 "/loan/approve/**",
+                                "/api/v1/loan/approve/**",
                                 "/loan/reject/**",
+                                "/api/v1/loan/reject/**",
                                 "/loan/disburse/**",
-                                "/transaction/all"
+                                "/api/v1/loan/disburse/**",
+                                "/transaction/all",
+                                "/api/v1/transaction/all"
                         ).hasAnyRole("STAFF", "ADMIN")
 
                         // Customer / shared endpoints requiring authentication
                         .requestMatchers(
                                 "/customer/**",
+                                "/api/v1/customer/**",
                                 "/transaction/**",
+                                "/api/v1/transaction/**",
                                 "/loan/**",
-                                "/notification/**"
+                                "/api/v1/loan/**",
+                                "/notification/**",
+                                "/api/v1/notification/**"
                         ).authenticated()
 
                         // Any other endpoint

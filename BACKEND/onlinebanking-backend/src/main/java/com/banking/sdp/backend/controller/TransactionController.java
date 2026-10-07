@@ -7,6 +7,11 @@ import com.banking.sdp.backend.model.Transaction;
 import com.banking.sdp.backend.repository.TransactionRepository;
 import com.banking.sdp.backend.service.CustomerService;
 import com.banking.sdp.backend.service.TransactionService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +29,8 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/transaction")
+@RequestMapping({"/api/v1/transaction", "/transaction"})
+@Tag(name = "Transaction Management", description = "Endpoints for funds transfers, deposits, withdrawals, history querying, and bank statement generation")
 public class TransactionController {
 
     @Autowired
@@ -36,11 +42,17 @@ public class TransactionController {
     @Autowired
     private TransactionRepository transactionRepository;
 
-    // Add transaction (Deposit / Withdraw)
+    @Operation(summary = "Add deposit or withdrawal transaction", description = "Directly records a credit or debit operation on customer balance")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Transaction recorded"),
+            @ApiResponse(responseCode = "400", description = "Invalid transaction parameters or insufficient funds"),
+            @ApiResponse(responseCode = "403", description = "Customer ownership required"),
+            @ApiResponse(responseCode = "404", description = "Customer not found")
+    })
     @PostMapping("/add/{customerId}")
     @PreAuthorize("@securityService.isCustomerOwner(#customerId)")
     public ResponseEntity<?> addTransaction(
-            @PathVariable Long customerId,
+            @Parameter(description = "Customer ID") @PathVariable Long customerId,
             @Valid @RequestBody DepositWithdrawRequest request) {
 
         Customer customer = customerService.getCustomerById(customerId);
@@ -63,13 +75,18 @@ public class TransactionController {
         return ResponseEntity.ok(saved);
     }
 
-    // Get transactions of a customer with optional pagination
+    @Operation(summary = "Get transactions for customer", description = "Returns customer ledger history with optional pagination")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Transaction list retrieved"),
+            @ApiResponse(responseCode = "403", description = "Customer ownership required"),
+            @ApiResponse(responseCode = "404", description = "Customer not found")
+    })
     @GetMapping("/customer/{customerId}")
     @PreAuthorize("@securityService.isCustomerOwner(#customerId)")
     public ResponseEntity<?> getCustomerTransactions(
-            @PathVariable Long customerId,
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size) {
+            @Parameter(description = "Customer ID") @PathVariable Long customerId,
+            @Parameter(description = "Zero-based page index") @RequestParam(required = false) Integer page,
+            @Parameter(description = "Page size") @RequestParam(required = false) Integer size) {
 
         Customer customer = customerService.getCustomerById(customerId);
         if (customer == null) {
@@ -85,10 +102,10 @@ public class TransactionController {
         return ResponseEntity.ok(list);
     }
 
-    // Get balance for a customer
+    @Operation(summary = "Get current customer balance", description = "Calculates verified balance for a customer")
     @GetMapping("/balance/{customerId}")
     @PreAuthorize("@securityService.isCustomerOwner(#customerId)")
-    public ResponseEntity<?> getBalance(@PathVariable Long customerId) {
+    public ResponseEntity<?> getBalance(@Parameter(description = "Customer ID") @PathVariable Long customerId) {
         Customer customer = customerService.getCustomerById(customerId);
         if (customer == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Customer not found"));
@@ -97,13 +114,13 @@ public class TransactionController {
         return ResponseEntity.ok(Map.of("balance", balance));
     }
 
-    // Download PDF statement
+    @Operation(summary = "Download PDF bank statement", description = "Generates a styled PDF bank statement within the specified date range")
     @GetMapping("/customer/{customerId}/statement")
     @PreAuthorize("@securityService.isCustomerOwner(#customerId)")
     public ResponseEntity<byte[]> downloadStatement(
-            @PathVariable Long customerId,
-            @RequestParam String fromDate,
-            @RequestParam String toDate) {
+            @Parameter(description = "Customer ID") @PathVariable Long customerId,
+            @Parameter(description = "Start date (YYYY-MM-DD)") @RequestParam String fromDate,
+            @Parameter(description = "End date (YYYY-MM-DD)") @RequestParam String toDate) {
 
         try {
             Customer customer = customerService.getCustomerById(customerId);
@@ -126,14 +143,14 @@ public class TransactionController {
         }
     }
 
-    // Staff/Admin: Get all transactions with pagination and filtering
+    @Operation(summary = "View all transactions (Staff / Admin)", description = "Staff and admin view across all transactions with filtering and pagination")
     @GetMapping("/all")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<?> getAllTransactions(
-            @RequestParam(required = false) Integer page,
-            @RequestParam(required = false) Integer size,
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) String search) {
+            @Parameter(description = "Zero-based page index") @RequestParam(required = false) Integer page,
+            @Parameter(description = "Page size") @RequestParam(required = false) Integer size,
+            @Parameter(description = "Transaction type filter: Credit or Debit") @RequestParam(required = false) String type,
+            @Parameter(description = "Search description or reference") @RequestParam(required = false) String search) {
 
         if (page != null && size != null) {
             Pageable pageable = PageRequest.of(page, size, Sort.by("transactionDate").descending());
@@ -144,7 +161,12 @@ public class TransactionController {
         return ResponseEntity.ok(allTxns);
     }
 
-    // Transfer funds between customers (by ID)
+    @Operation(summary = "Transfer funds by customer ID", description = "Executes an atomic funds transfer between two customer IDs with pessimistic locking and idempotency protection")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Transfer completed successfully"),
+            @ApiResponse(responseCode = "400", description = "Insufficient funds, limit exceeded, or invalid IDs"),
+            @ApiResponse(responseCode = "403", description = "Unauthorized sender transfer")
+    })
     @PostMapping("/transfer")
     @PreAuthorize("@securityService.isCustomerOwner(#fromCustomerId)")
     public ResponseEntity<?> transferFunds(
@@ -175,7 +197,12 @@ public class TransactionController {
         }
     }
 
-    // Transfer funds using account number
+    @Operation(summary = "Transfer funds by account number", description = "Executes an atomic funds transfer using destination account number")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Transfer completed successfully"),
+            @ApiResponse(responseCode = "400", description = "Insufficient funds, recipient account not found, or limit exceeded"),
+            @ApiResponse(responseCode = "403", description = "Unauthorized sender transfer")
+    })
     @PostMapping("/transfer/by-account")
     @PreAuthorize("@securityService.isCustomerOwner(#fromCustomerId)")
     public ResponseEntity<?> transferFundsByAccount(

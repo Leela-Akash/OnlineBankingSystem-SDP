@@ -3,6 +3,10 @@ package com.banking.sdp.backend.controller;
 import com.banking.sdp.backend.dto.JwtResponse;
 import com.banking.sdp.backend.dto.RefreshTokenRequest;
 import com.banking.sdp.backend.util.JwtUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -12,12 +16,20 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/auth")
+@RequestMapping({"/api/v1/auth", "/auth"})
+@Tag(name = "Authentication", description = "Endpoints for user session management and JWT token lifecycle")
 public class AuthController {
 
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Operation(summary = "Refresh JWT access token",
+            description = "Exchange an active refresh token for a newly minted short-lived JWT access token and rotated refresh token.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Token refreshed successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid token type supplied"),
+            @ApiResponse(responseCode = "401", description = "Expired or forged refresh token")
+    })
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
         String refreshToken = request.getRefreshToken();

@@ -12,6 +12,11 @@ import com.banking.sdp.backend.service.CustomerService;
 import com.banking.sdp.backend.service.StaffService;
 import com.banking.sdp.backend.service.TransactionService;
 import com.banking.sdp.backend.util.JwtUtil;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +29,8 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/staff")
+@RequestMapping({"/api/v1/staff", "/staff"})
+@Tag(name = "Staff Operations", description = "Endpoints for bank operations staff authentication, profile management, and dashboard analytics")
 public class StaffController {
 
     @Autowired
@@ -42,7 +48,12 @@ public class StaffController {
     @Autowired
     private LoginRateLimiterService rateLimiterService;
 
-    // Staff login with JWT and rate limiting
+    @Operation(summary = "Staff login", description = "Authenticates banking staff credentials with rate-limiting and issues JWT")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Authentication successful"),
+            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
+            @ApiResponse(responseCode = "429", description = "Account locked due to excessive failed attempts")
+    })
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request) {
         String clientIp = request.getRemoteAddr();
@@ -76,10 +87,15 @@ public class StaffController {
         }
     }
 
-    // Get staff profile
+    @Operation(summary = "Get staff profile", description = "Fetches employee details by staff ID")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile retrieved"),
+            @ApiResponse(responseCode = "403", description = "Forbidden"),
+            @ApiResponse(responseCode = "404", description = "Staff member not found")
+    })
     @GetMapping("/profile/{staffId}")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
-    public ResponseEntity<?> getProfile(@PathVariable Long staffId) {
+    public ResponseEntity<?> getProfile(@Parameter(description = "Staff Member ID") @PathVariable Long staffId) {
         Staff s = staffService.getStaffProfile(staffId);
         if (s != null) {
             return ResponseEntity.ok(s);
@@ -88,7 +104,12 @@ public class StaffController {
         }
     }
 
-    // Admin: Add staff with validation
+    @Operation(summary = "Register staff member (Admin only)", description = "Adds a new staff employee to the banking institution")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Staff created successfully"),
+            @ApiResponse(responseCode = "403", description = "Admin privilege required"),
+            @ApiResponse(responseCode = "409", description = "Username, email, or phone number conflict")
+    })
     @PostMapping("/add")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> addStaff(@Valid @RequestBody StaffRegistrationRequest request) {
@@ -106,7 +127,10 @@ public class StaffController {
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", result));
     }
 
-    // Get dashboard stats for staff
+    @Operation(summary = "Get staff dashboard metrics", description = "Retrieves high-level counts for total customers, deposits, and withdrawals")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Dashboard statistics retrieved")
+    })
     @GetMapping("/dashboard")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<?> getDashboardStats() {
