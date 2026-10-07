@@ -69,7 +69,7 @@
 - [x] Build and test verification, git commit: `phase-8: deployment readiness`.
 
 ## Final Verification
-- [ ] Full backend build and tests pass.
-- [ ] Frontend build succeeds cleanly.
-- [ ] End-to-end smoke test across roles (Admin, Staff, Customer).
-- [ ] Final project summary and delivery.
+- [x] Full backend build and tests pass.
+- [x] Frontend build succeeds cleanly.
+- [x] End-to-end smoke test across roles (Admin, Staff, Customer).
+- [x] Final project summary and delivery.
