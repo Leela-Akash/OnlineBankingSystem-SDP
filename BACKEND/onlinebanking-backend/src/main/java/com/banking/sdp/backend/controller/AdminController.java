@@ -1,19 +1,28 @@
 package com.banking.sdp.backend.controller;
 
-import java.util.List;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import com.banking.sdp.backend.dto.JwtResponse;
+import com.banking.sdp.backend.dto.LoginRequest;
+import com.banking.sdp.backend.dto.StaffRegistrationRequest;
+import com.banking.sdp.backend.exception.RateLimitExceededException;
 import com.banking.sdp.backend.model.Admin;
 import com.banking.sdp.backend.model.Customer;
 import com.banking.sdp.backend.model.Staff;
+import com.banking.sdp.backend.security.LoginRateLimiterService;
 import com.banking.sdp.backend.service.AdminService;
-import com.banking.sdp.backend.dto.JwtResponse;
 import com.banking.sdp.backend.util.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin")
-@CrossOrigin("*")
 public class AdminController {
 
     @Autowired
@@ -22,55 +31,105 @@ public class AdminController {
     @Autowired
     private JwtUtil jwtUtil;
 
+    @Autowired
+    private LoginRateLimiterService rateLimiterService;
+
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Admin admin) {
-        Admin a = adminService.checkAdminLogin(admin.getUsername(), admin.getPassword());
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+        String clientIp = request.getRemoteAddr();
+        String rateLimitKey = "admin:" + loginRequest.getUsername() + ":" + clientIp;
+
+        if (rateLimiterService.isBlocked(rateLimitKey)) {
+            long remaining = rateLimiterService.getRemainingLockoutSeconds(rateLimitKey);
+            throw new RateLimitExceededException(
+                    "Too many failed login attempts. Account temporarily locked. Please try again after " + remaining + " seconds.");
+        }
+
+        Admin a = adminService.checkAdminLogin(loginRequest.getUsername(), loginRequest.getPassword());
         if (a != null) {
-            String token = jwtUtil.generateToken(a.getUsername(), "ADMIN", 0L);
-            JwtResponse response = new JwtResponse(token, 0L, a.getUsername(), "ADMIN");
+            rateLimiterService.resetAttempts(rateLimitKey);
+
+            String accessToken = jwtUtil.generateAccessToken(a.getUsername(), "ADMIN", 0L);
+            String refreshToken = jwtUtil.generateRefreshToken(a.getUsername(), "ADMIN", 0L);
+
+            JwtResponse response = new JwtResponse(
+                    accessToken,
+                    refreshToken,
+                    0L,
+                    a.getUsername(),
+                    "ADMIN",
+                    JwtUtil.ACCESS_TOKEN_VALIDITY
+            );
             return ResponseEntity.ok(response);
         } else {
-            return ResponseEntity.status(401).body("Invalid Username or Password");
+            rateLimiterService.recordFailedAttempt(rateLimitKey);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid Username or Password"));
         }
     }
 
     @GetMapping("/customers")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Customer>> getAllCustomers() {
         return ResponseEntity.ok(adminService.viewAllCustomers());
     }
 
     @GetMapping("/staff")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Staff>> getAllStaff() {
         return ResponseEntity.ok(adminService.viewAllStaff());
     }
 
     @PostMapping("/addstaff")
-    public ResponseEntity<String> addStaff(@RequestBody Staff staff) {
-        return ResponseEntity.ok(adminService.addStaff(staff));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> addStaff(@Valid @RequestBody StaffRegistrationRequest request) {
+        Staff staff = new Staff();
+        staff.setFullName(request.getFullName());
+        staff.setUsername(request.getUsername());
+        staff.setPassword(request.getPassword());
+        staff.setEmail(request.getEmail());
+        staff.setPhone(request.getPhone());
+
+        String result = adminService.addStaff(staff);
+        if (result.contains("exists")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", result));
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", result));
     }
 
     @DeleteMapping("/deletecustomer")
-    public ResponseEntity<String> deleteCustomer(@RequestParam Long customerId) {
-        return ResponseEntity.ok(adminService.deleteCustomer(customerId));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteCustomer(@RequestParam Long customerId) {
+        String result = adminService.deleteCustomer(customerId);
+        if (result.contains("Not Found")) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", result));
+        }
+        return ResponseEntity.ok(Map.of("message", result));
     }
 
     @DeleteMapping("/deletestaff")
-    public ResponseEntity<String> deleteStaff(@RequestParam Long staffId) {
-        return ResponseEntity.ok(adminService.deleteStaff(staffId));
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> deleteStaff(@RequestParam Long staffId) {
+        String result = adminService.deleteStaff(staffId);
+        if (result.contains("Not Found")) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", result));
+        }
+        return ResponseEntity.ok(Map.of("message", result));
     }
 
     @GetMapping("/customercount")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Long> getCustomerCount() {
         return ResponseEntity.ok(adminService.getCustomerCount());
     }
 
     @GetMapping("/staffcount")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Long> getStaffCount() {
         return ResponseEntity.ok(adminService.getStaffCount());
     }
 
-    // Get comprehensive system reports
     @GetMapping("/reports")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getReports() {
         return ResponseEntity.ok(adminService.getSystemReports());
     }

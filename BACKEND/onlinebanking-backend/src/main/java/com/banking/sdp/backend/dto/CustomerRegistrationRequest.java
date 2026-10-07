@@ -1,38 +1,38 @@
-package com.banking.sdp.backend.model;
+package com.banking.sdp.backend.dto;
 
-import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
-@Entity
-@Table(name = "customer_table")
-public class Customer {
+public class CustomerRegistrationRequest {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(unique = true, nullable = false, length = 12)
-    private String accountNumber;
-
+    @NotBlank(message = "Full name is required")
+    @Size(min = 2, max = 100, message = "Full name must be between 2 and 100 characters")
     private String fullName;
+
+    @NotBlank(message = "Username is required")
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
     private String username;
 
-    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
-    @Column(length = 255)
+    @NotBlank(message = "Password is required")
+    @Size(min = 6, max = 100, message = "Password must be at least 6 characters")
     private String password;
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Valid email address is required")
     private String email;
+
+    @NotBlank(message = "Phone number is required")
+    @Pattern(regexp = "^[0-9]{10}$", message = "Phone must be a valid 10-digit number")
     private String phone;
+
     private String address;
     private LocalDate dob;
     private String gender;
-    private Double accountBalance;
 
-    // Getters and Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
-    public String getAccountNumber() { return accountNumber; }
-    public void setAccountNumber(String accountNumber) { this.accountNumber = accountNumber; }
+    public CustomerRegistrationRequest() {}
 
     public String getFullName() { return fullName; }
     public void setFullName(String fullName) { this.fullName = fullName; }
@@ -57,7 +57,4 @@ public class Customer {
 
     public String getGender() { return gender; }
     public void setGender(String gender) { this.gender = gender; }
-
-    public Double getAccountBalance() { return accountBalance; }
-    public void setAccountBalance(Double accountBalance) { this.accountBalance = accountBalance; }
 }

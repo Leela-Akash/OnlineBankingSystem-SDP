@@ -1,22 +1,30 @@
 package com.banking.sdp.backend.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import com.banking.sdp.backend.model.Staff;
-import com.banking.sdp.backend.service.StaffService;
-import com.banking.sdp.backend.model.Customer;
-import com.banking.sdp.backend.model.Transaction;
-import com.banking.sdp.backend.service.TransactionService;
-import com.banking.sdp.backend.service.CustomerService;
 import com.banking.sdp.backend.dto.JwtResponse;
+import com.banking.sdp.backend.dto.LoginRequest;
+import com.banking.sdp.backend.dto.StaffRegistrationRequest;
+import com.banking.sdp.backend.exception.RateLimitExceededException;
+import com.banking.sdp.backend.model.Customer;
+import com.banking.sdp.backend.model.Staff;
+import com.banking.sdp.backend.model.Transaction;
+import com.banking.sdp.backend.security.LoginRateLimiterService;
+import com.banking.sdp.backend.service.CustomerService;
+import com.banking.sdp.backend.service.StaffService;
+import com.banking.sdp.backend.service.TransactionService;
 import com.banking.sdp.backend.util.JwtUtil;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/staff")
-@CrossOrigin("*")
 public class StaffController {
 
     @Autowired
@@ -31,39 +39,76 @@ public class StaffController {
     @Autowired
     private JwtUtil jwtUtil;
 
-    // Staff login with JWT
+    @Autowired
+    private LoginRateLimiterService rateLimiterService;
+
+    // Staff login with JWT and rate limiting
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Staff staff) {
-        Staff s = staffService.checkStaffLogin(staff.getUsername(), staff.getPassword());
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+        String clientIp = request.getRemoteAddr();
+        String rateLimitKey = "staff:" + loginRequest.getUsername() + ":" + clientIp;
+
+        if (rateLimiterService.isBlocked(rateLimitKey)) {
+            long remaining = rateLimiterService.getRemainingLockoutSeconds(rateLimitKey);
+            throw new RateLimitExceededException(
+                    "Too many failed login attempts. Account temporarily locked. Please try again after " + remaining + " seconds.");
+        }
+
+        Staff s = staffService.checkStaffLogin(loginRequest.getUsername(), loginRequest.getPassword());
         if (s != null) {
-            String token = jwtUtil.generateToken(s.getUsername(), "STAFF", s.getId());
-            JwtResponse response = new JwtResponse(token, s.getId(), s.getUsername(), "STAFF");
+            rateLimiterService.resetAttempts(rateLimitKey);
+
+            String accessToken = jwtUtil.generateAccessToken(s.getUsername(), "STAFF", s.getId());
+            String refreshToken = jwtUtil.generateRefreshToken(s.getUsername(), "STAFF", s.getId());
+
+            JwtResponse response = new JwtResponse(
+                    accessToken,
+                    refreshToken,
+                    s.getId(),
+                    s.getUsername(),
+                    "STAFF",
+                    JwtUtil.ACCESS_TOKEN_VALIDITY
+            );
             return ResponseEntity.ok(response);
         } else {
-            return ResponseEntity.status(401).body("Invalid Username or Password");
+            rateLimiterService.recordFailedAttempt(rateLimitKey);
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid Username or Password"));
         }
     }
 
     // Get staff profile
     @GetMapping("/profile/{staffId}")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<?> getProfile(@PathVariable Long staffId) {
         Staff s = staffService.getStaffProfile(staffId);
-        if (s != null) return ResponseEntity.ok(s);
-        else return ResponseEntity.status(404).body("Staff Not Found");
+        if (s != null) {
+            return ResponseEntity.ok(s);
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Staff Not Found"));
+        }
     }
 
-    // Admin: Add staff with duplicate checks
+    // Admin: Add staff with validation
     @PostMapping("/add")
-    public ResponseEntity<String> addStaff(@RequestBody Staff staff) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> addStaff(@Valid @RequestBody StaffRegistrationRequest request) {
+        Staff staff = new Staff();
+        staff.setFullName(request.getFullName());
+        staff.setUsername(request.getUsername());
+        staff.setPassword(request.getPassword());
+        staff.setEmail(request.getEmail());
+        staff.setPhone(request.getPhone());
+
         String result = staffService.registerStaff(staff);
         if (result.contains("exists")) {
-            return ResponseEntity.status(400).body(result);
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", result));
         }
-        return ResponseEntity.ok(result);
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", result));
     }
 
     // Get dashboard stats for staff
     @GetMapping("/dashboard")
+    @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
     public ResponseEntity<?> getDashboardStats() {
         List<Customer> customers = customerService.getAllCustomers();
         List<Transaction> transactions = transactionService.getAllTransactions();
@@ -79,7 +124,6 @@ public class StaffController {
         return ResponseEntity.ok(new StaffDashboardStats(totalCustomers, totalDeposits, totalWithdrawals));
     }
 
-    // DTO for dashboard
     public static class StaffDashboardStats {
         public long totalCustomers;
         public long totalDeposits;

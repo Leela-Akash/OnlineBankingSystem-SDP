@@ -14,6 +14,9 @@ public class CustomerServiceImpl implements CustomerService {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @Override
     public String registerCustomer(Customer customer) {
         if (customerRepository.existsByUsername(customer.getUsername())) {
@@ -29,6 +32,11 @@ public class CustomerServiceImpl implements CustomerService {
         // Generate unique account number
         String accountNumber = generateUniqueAccountNumber();
         customer.setAccountNumber(accountNumber);
+
+        // Secure password with BCrypt
+        if (customer.getPassword() != null) {
+            customer.setPassword(passwordEncoder.encode(customer.getPassword()));
+        }
         
         customerRepository.save(customer);
         return "Customer Registered Successfully with Account Number: " + accountNumber;
@@ -48,14 +56,27 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public Customer checkCustomerLogin(String username, String password) {
-        return customerRepository.findByUsernameAndPassword(username, password);
+        java.util.Optional<Customer> optionalCustomer = customerRepository.findByUsername(username);
+        if (optionalCustomer.isPresent()) {
+            Customer customer = optionalCustomer.get();
+            if (passwordEncoder.matches(password, customer.getPassword())) {
+                return customer;
+            }
+            // Support legacy plaintext passwords by upgrading them on the fly
+            if (password.equals(customer.getPassword())) {
+                customer.setPassword(passwordEncoder.encode(password));
+                customerRepository.save(customer);
+                return customer;
+            }
+        }
+        return null;
     }
 
     @Override
     public String updateCustomerProfile(Customer customer) {
         Customer existing = customerRepository.findById(customer.getId()).orElse(null);
         if (existing != null) {
-            // Optional: prevent duplicates during update
+            // Prevent duplicates during update
             if (!existing.getUsername().equals(customer.getUsername()) &&
                 customerRepository.existsByUsername(customer.getUsername())) {
                 return "Username already exists!";
@@ -72,12 +93,14 @@ public class CustomerServiceImpl implements CustomerService {
             existing.setFullName(customer.getFullName());
             existing.setEmail(customer.getEmail());
             existing.setUsername(customer.getUsername());
-            existing.setPassword(customer.getPassword());
+            if (customer.getPassword() != null && !customer.getPassword().isBlank()) {
+                existing.setPassword(passwordEncoder.encode(customer.getPassword()));
+            }
             existing.setPhone(customer.getPhone());
             existing.setAddress(customer.getAddress());
             existing.setDob(customer.getDob());
             existing.setGender(customer.getGender());
-            existing.setAccountBalance(customer.getAccountBalance());
+            // Intentionally DO NOT copy customer.getAccountBalance() - balance is managed solely by transactions/financial operations
 
             customerRepository.save(existing);
             return "Customer Profile Updated Successfully";

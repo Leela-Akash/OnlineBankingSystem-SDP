@@ -12,6 +12,9 @@ public class Staff {
 
     private String fullName;
     private String username;
+
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+    @Column(length = 255)
     private String password;
     private String email;
     private String phone;

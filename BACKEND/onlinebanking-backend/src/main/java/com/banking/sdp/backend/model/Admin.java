@@ -10,7 +10,8 @@ public class Admin {
     @Column(length = 50)
     private String username;
 
-    @Column(length = 50, nullable = false)
+    @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
+    @Column(length = 255, nullable = false)
     private String password;
 
     // Getters and Setters

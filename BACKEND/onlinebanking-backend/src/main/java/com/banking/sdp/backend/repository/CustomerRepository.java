@@ -7,6 +7,8 @@ import com.banking.sdp.backend.model.Customer;
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
     Customer findByUsernameAndPassword(String username, String password);
+    java.util.Optional<Customer> findByUsername(String username);
+    java.util.Optional<Customer> findByEmail(String email);
 
     // Find by account number
     Customer findByAccountNumber(String accountNumber);

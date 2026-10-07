@@ -7,6 +7,7 @@ import com.banking.sdp.backend.model.Staff;
 @Repository
 public interface StaffRepository extends JpaRepository<Staff, Long> {
     Staff findByUsernameAndPassword(String username, String password);
+    java.util.Optional<Staff> findByUsername(String username);
 
     // For duplicate checks
     boolean existsByUsername(String username);

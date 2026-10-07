@@ -11,9 +11,24 @@ public class StaffServiceImpl implements StaffService {
     @Autowired
     private StaffRepository staffRepository;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @Override
     public Staff checkStaffLogin(String username, String password) {
-        return staffRepository.findByUsernameAndPassword(username, password);
+        java.util.Optional<Staff> opt = staffRepository.findByUsername(username);
+        if (opt.isPresent()) {
+            Staff s = opt.get();
+            if (passwordEncoder.matches(password, s.getPassword())) {
+                return s;
+            }
+            if (password.equals(s.getPassword())) {
+                s.setPassword(passwordEncoder.encode(password));
+                staffRepository.save(s);
+                return s;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -31,6 +46,10 @@ public class StaffServiceImpl implements StaffService {
         }
         if (staffRepository.existsByPhone(staff.getPhone())) {
             return "Phone number already exists! Please use a different one.";
+        }
+
+        if (staff.getPassword() != null) {
+            staff.setPassword(passwordEncoder.encode(staff.getPassword()));
         }
 
         staffRepository.save(staff);

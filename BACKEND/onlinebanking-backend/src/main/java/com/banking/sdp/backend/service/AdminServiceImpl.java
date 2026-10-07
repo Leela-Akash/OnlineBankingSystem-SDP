@@ -32,9 +32,24 @@ public class AdminServiceImpl implements AdminService {
     @Autowired
     private LoanRepository loanRepository;
 
+    @Autowired
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     @Override
     public Admin checkAdminLogin(String username, String password) {
-        return adminRepository.findByUsernameAndPassword(username, password);
+        java.util.Optional<Admin> opt = adminRepository.findById(username);
+        if (opt.isPresent()) {
+            Admin a = opt.get();
+            if (passwordEncoder.matches(password, a.getPassword())) {
+                return a;
+            }
+            if (password.equals(a.getPassword())) {
+                a.setPassword(passwordEncoder.encode(password));
+                adminRepository.save(a);
+                return a;
+            }
+        }
+        return null;
     }
 
     @Override
@@ -49,6 +64,18 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public String addStaff(Staff staff) {
+        if (staffRepository.existsByUsername(staff.getUsername())) {
+            return "Username already exists! Please choose another one.";
+        }
+        if (staffRepository.existsByEmail(staff.getEmail())) {
+            return "Email already exists! Please use a different email.";
+        }
+        if (staffRepository.existsByPhone(staff.getPhone())) {
+            return "Phone number already exists! Please use a different one.";
+        }
+        if (staff.getPassword() != null) {
+            staff.setPassword(passwordEncoder.encode(staff.getPassword()));
+        }
         staffRepository.save(staff);
         return "Staff Added Successfully";
     }
