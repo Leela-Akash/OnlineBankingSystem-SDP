@@ -6,11 +6,9 @@ COPY .mvn .mvn
 COPY mvnw pom.xml ./
 
 RUN chmod +x mvnw
-RUN ./mvnw dependency:go-offline -DskipTests
-
 COPY src src
 
-RUN ./mvnw clean package -DskipTests
+RUN ./mvnw clean package -DskipTests -B
 
 FROM eclipse-temurin:21-jre-jammy
 

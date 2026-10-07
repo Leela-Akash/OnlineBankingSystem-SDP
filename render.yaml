@@ -1,0 +1,45 @@
+services:
+  # -------------------------------------------------------------
+  # Backend Web Service: Spring Boot 3.5.6 (Java 21 LTS / Docker)
+  # -------------------------------------------------------------
+  - type: web
+    name: nexus-banking-backend
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerContext: BACKEND/onlinebanking-backend
+    plan: free
+    healthCheckPath: /actuator/health
+    autoDeploy: true
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: PORT
+        value: 8080
+      - key: DB_URL
+        sync: false
+      - key: DB_USERNAME
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  # -------------------------------------------------------------
+  # Frontend Static Site: React 19 + Vite (Alternative to Vercel)
+  # -------------------------------------------------------------
+  - type: static
+    name: nexus-banking-frontend
+    env: static
+    rootDir: FRONTEND/onlinebanking-frontend
+    buildCommand: npm run build
+    staticPublishPath: dist
+    autoDeploy: true
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

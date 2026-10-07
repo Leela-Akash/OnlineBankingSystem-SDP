@@ -83,3 +83,8 @@ pnpm-debug.log*
 # Logs and Run Output
 logs/
 *.log
+
+# Temporary test profiles
+docs/screenshots/*_profile/
+docs/screenshots/chrome_profile/
+docs/screenshots/temp_profile/

@@ -1,140 +1,157 @@
-# 🚀 Deployment Guide: Nexus Online Banking System
+# 🚀 Deployment & Continuous Deployment (CI/CD) Guide: Nexus Banking
 
-This guide provides end-to-end instructions for deploying the **Nexus Online Banking System** to cloud environments (Render, Railway, AWS, Vercel, Netlify) with production configurations.
+This guide provides the complete, recommended path for deploying the **Nexus Online Banking System** with **Automatic Continuous Deployment**:
+- **Backend**: Spring Boot 3.5.6 (Java 21 LTS) deployed as a Docker Web Service on **Render**.
+- **Frontend**: React 19 + Vite 7 Single Page Application deployed on **Vercel** (or Render Static Site).
+- **Database**: Cloud MySQL 8 instance on **TiDB Cloud Serverless** or **Aiven for MySQL** (100% free tier).
+- **Automatic Auto-Update (CD)**: Whenever you push code changes to GitHub `main`, both Render and Vercel automatically build and redeploy within minutes with zero downtime!
 
 ---
 
-## 📋 Architecture & Deployment Overview
+## 🏗️ Architecture & Auto-Deployment Pipeline
 
-- **Backend**: Spring Boot 3.5.6 (Java 21 LTS) containerized via multi-stage Docker build.
-  - Recommended platforms: **Render**, **Railway**, **Fly.io**, or **AWS ECS/App Runner**.
-- **Database**: Managed MySQL 8.0 instance.
-  - Recommended providers: **Railway MySQL**, **Aiven for MySQL**, or **Amazon RDS**.
-- **Frontend**: Single Page Application (SPA) built with React 19 and Vite 7.
-  - Recommended platforms: **Vercel**, **Netlify**, or **Cloudflare Pages**.
+```mermaid
+flowchart LR
+    Dev[Developer git push] -->|main branch| GitHub[GitHub Repo: OnlineBankingSystem-SDP]
+    GitHub -->|Webhook Trigger| Render[Render.com\nBackend Docker Web Service]
+    GitHub -->|Webhook Trigger| Vercel[Vercel.com\nFrontend Edge CDN]
+    GitHub -->|GitHub Actions| CI[CI Pipeline: Tests & Build]
+    Render -->|JDBC Connection| DB[(Cloud MySQL / TiDB Serverless)]
+    Vercel -->|REST API / HTTPS| Render
+```
 
 ---
 
 ## 🔑 Environment Variables Matrix
 
-### Backend Configuration
+### Backend Configuration (Render)
 
-| Variable | Required | Description | Example / Default |
+| Variable | Required | Description | Example / Recommended Value |
 | :--- | :---: | :--- | :--- |
 | `SPRING_PROFILES_ACTIVE` | Yes | Active Spring profile | `prod` |
-| `PORT` | Yes | HTTP port (injected by host) | `8080` (or host assigned) |
-| `DB_URL` | Yes | JDBC MySQL connection URL | `jdbc:mysql://<host>:<port>/<db>?useSSL=true&serverTimezone=UTC` |
-| `DB_USERNAME` | Yes | Database username | `banking_user` |
-| `DB_PASSWORD` | Yes | Database password | `<strong_password>` |
-| `JWT_SECRET` | Yes | 256-bit+ Base64 or plain string | `c2VjdXJlQmFua2luZ1N5c3RlbVNlY3JldEtleUZvckpXVFRva2VuR2VuZXJhdGlvbjEyMzQ1Ng==` |
-| `ALLOWED_ORIGINS` | Yes | Comma-delimited frontend URLs | `https://nexus-banking.vercel.app,http://localhost:5173` |
+| `PORT` | Yes | Injected by Render | `8080` (or leave default) |
+| `DB_URL` | Yes | JDBC MySQL connection URL | `jdbc:mysql://<HOST>:<PORT>/<DB>?sslMode=VERIFY_IDENTITY` |
+| `DB_USERNAME` | Yes | Database username | `<your_db_username>` |
+| `DB_PASSWORD` | Yes | Database password | `<your_db_password>` |
+| `JWT_SECRET` | Yes | Base64 or 32+ char secret | `c2VjdXJlQmFua2luZ1N5c3RlbVNlY3JldEtleUZvckpXVFRva2VuR2VuZXJhdGlvbjEyMzQ1Ng==` |
+| `ALLOWED_ORIGINS` | Yes | Allowed frontend origins (supports wildcard) | `https://*.vercel.app,https://<your-app>.vercel.app,http://localhost:5173` |
 
-### Frontend Configuration
+### Frontend Configuration (Vercel)
 
 | Variable | Required | Description | Example |
 | :--- | :---: | :--- | :--- |
-| `VITE_API_URL` | Yes | Backend public API base URL | `https://nexus-backend.onrender.com` |
+| `VITE_API_URL` | Yes | Render Backend Public URL (no trailing slash) | `https://nexus-banking-backend.onrender.com` |
 
 ---
 
-## 🗄️ Step 1: Provision Managed MySQL Database
+## 🗄️ Step 1: Provision Free Cloud MySQL Database
 
-1. Sign up or log into **Railway** (or **Aiven** / **Render**).
-2. Create a new service and select **MySQL Database (8.0)**.
-3. Once initialized, note the connection credentials:
-   - `Host`, `Port`, `Database Name`, `Username`, `Password`.
-4. Construct the standard JDBC connection string:
+The application requires a MySQL 8+ compatible database. We recommend **TiDB Cloud Serverless** or **Aiven for MySQL** (both are free forever without credit card):
+
+### Recommended: TiDB Cloud Serverless (MySQL 8 Compatible)
+1. Go to [https://tidbcloud.com](https://tidbcloud.com) and click **Sign in with GitHub**.
+2. Click **Create Cluster** and choose **Serverless (Free Forever)**.
+3. Once the cluster is active (approx. 10 seconds), click **Connect**.
+4. Select language/driver: **Java / JDBC** (or MySQL CLI).
+5. Copy your connection details:
+   - **Host**: e.g., `gateway01.us-east-1.prod.aws.tidbcloud.com`
+   - **Port**: `4000`
+   - **User**: e.g., `xxxxxxxx.root`
+   - **Password**: `<your_cluster_password>`
+   - **Database**: `test` or create `online_banking`
+6. Your `DB_URL` will look like:
    ```text
-   jdbc:mysql://<HOST>:<PORT>/<DATABASE>?useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC
+   jdbc:mysql://gateway01.us-east-1.prod.aws.tidbcloud.com:4000/online_banking?useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC
    ```
-5. *Note*: Flyway database migrations (`V1__init_schema.sql` and `V2__seed_demo_data.sql`) will automatically execute on the first boot of the backend application, provisioning the schema and seeding default demo accounts.
+> **Note**: Flyway automatically runs database migrations (`V1__init_schema.sql` and `V2__seed_demo_data.sql`) during the very first boot of the Spring Boot application, creating all required tables and seeding demo users (Customer, Staff, Admin) automatically!
 
 ---
 
-## ⚙️ Step 2: Deploy Backend to Render
+## ⚙️ Step 2: Deploy Backend to Render (with Auto-Deploy)
 
-1. Sign into [Render.com](https://render.com).
+1. Sign into [https://render.com](https://render.com) using your GitHub account (`Leela-Akash`).
 2. Click **New +** > **Web Service**.
-3. Connect your GitHub repository: `OnlineBankingSystem-SDP`.
-4. Configure service settings:
+3. Select your repository: `Leela-Akash/OnlineBankingSystem-SDP`.
+4. Configure service parameters:
    - **Name**: `nexus-banking-backend`
-   - **Region**: Choose the region closest to your MySQL database.
+   - **Region**: Choose the region closest to your database (e.g. Frankfurt, Oregon, Ohio).
    - **Root Directory**: `BACKEND/onlinebanking-backend`
    - **Environment**: **Docker**
    - **Dockerfile Path**: `Dockerfile`
-5. In the **Environment Variables** section, add:
+   - **Auto-Deploy**: **Yes** *(ensures every future git push automatically rebuilds and deploys!)*
+5. Scroll down to **Environment Variables** and add:
    - `SPRING_PROFILES_ACTIVE` = `prod`
-   - `DB_URL` = `jdbc:mysql://<host>:<port>/<database>?useSSL=true&allowPublicKeyRetrieval=true&serverTimezone=UTC`
+   - `DB_URL` = `<your_jdbc_mysql_url>`
    - `DB_USERNAME` = `<your_mysql_username>`
    - `DB_PASSWORD` = `<your_mysql_password>`
-   - `JWT_SECRET` = `<min_32_characters_secret_string>`
-   - `ALLOWED_ORIGINS` = `https://<your-frontend-domain>.vercel.app`
-6. Set the **Health Check Path** to:
-   ```text
-   /actuator/health
-   ```
+   - `JWT_SECRET` = `c2VjdXJlQmFua2luZ1N5c3RlbVNlY3JldEtleUZvckpXVFRva2VuR2VuZXJhdGlvbjEyMzQ1Ng==`
+   - `ALLOWED_ORIGINS` = `https://*.vercel.app,http://localhost:5173` *(you can update with your exact Vercel domain once deployed)*
+6. Set **Health Check Path** to `/actuator/health`.
 7. Click **Create Web Service**.
-8. After build succeeds, copy the public URL (e.g., `https://nexus-banking-backend.onrender.com`).
+8. Render will pull the repo, run the multi-stage Docker build, start Spring Boot, run Flyway migrations, and report healthy.
+9. Copy your backend service URL (e.g., `https://nexus-banking-backend.onrender.com`).
 
 ---
 
-## ⚙️ Step 3 (Alternative): Deploy Backend to Railway
+## 💻 Step 3: Deploy Frontend to Vercel (with Auto-Deploy)
 
-1. Sign into [Railway.app](https://railway.app).
-2. Create a new project from your GitHub repo.
-3. In settings, set the **Root Directory** to `/BACKEND/onlinebanking-backend`.
-4. Set the build type to **Dockerfile**.
-5. Add the environment variables listed in the matrix above.
-6. Under **Networking**, generate a public domain for the backend service.
-
----
-
-## 💻 Step 4: Deploy Frontend to Vercel
-
-1. Sign into [Vercel.com](https://vercel.com).
-2. Click **Add New...** > **Project** and import `OnlineBankingSystem-SDP`.
-3. Configure project settings:
+1. Sign into [https://vercel.com](https://vercel.com) using your GitHub account (`Leela-Akash`).
+2. Click **Add New...** > **Project**.
+3. Import your repository: `Leela-Akash/OnlineBankingSystem-SDP`.
+4. Configure project settings:
    - **Framework Preset**: `Vite`
-   - **Root Directory**: Click edit and select `FRONTEND/onlinebanking-frontend`.
+   - **Root Directory**: Click **Edit** and choose `FRONTEND/onlinebanking-frontend`.
    - **Build Command**: `npm run build`
    - **Output Directory**: `dist`
    - **Install Command**: `npm ci`
-4. Add Environment Variable:
-   - `VITE_API_URL` = `https://nexus-banking-backend.onrender.com` (your deployed backend URL without trailing slash).
-5. Ensure `vercel.json` is present in `FRONTEND/onlinebanking-frontend` (included in repository) to route all paths to `/index.html`.
+5. In the **Environment Variables** section:
+   - Key: `VITE_API_URL`
+   - Value: `https://nexus-banking-backend.onrender.com` *(your Render backend URL from Step 2, no trailing slash)*
 6. Click **Deploy**.
+7. Vercel will install dependencies, build the production bundle, and deploy to a live URL (e.g., `https://online-banking-system-sdp.vercel.app`).
+8. *(Optional)* Return to Render and update `ALLOWED_ORIGINS` with your exact Vercel URL:
+   `https://online-banking-system-sdp.vercel.app,https://*.vercel.app`
 
 ---
 
-## 🔍 Step 5: Post-Deployment Smoke Test & Verification
+## 🔄 Step 4: How Automatic Updates Work ("Continuous Deployment")
 
-Once both frontend and backend are live:
+Now that both Vercel and Render are linked to your GitHub repository:
 
-1. **Verify Actuator Health Check**:
-   - Access `https://<your-backend-domain>/actuator/health` in your browser.
-   - Expected status: `{"status":"UP"}`.
-2. **Verify Interactive API Documentation**:
-   - Access `https://<your-backend-domain>/swagger-ui/index.html`.
-   - Ensure endpoints and schemas are visible.
-3. **Smoke Test Customer Authentication**:
-   - Navigate to your frontend URL.
-   - Log in as Customer: `cust1` / `cust123`.
-   - Verify balance ($5,000.00) renders on dashboard.
-   - Perform a fund transfer of $50.00 to account `1001001002` (`cust2`).
-   - Download the generated branded PDF statement.
-4. **Smoke Test Staff Operations**:
-   - Log in as Staff: `staff1` / `staff123`.
-   - Navigate to loan approvals and verify submitted loan requests.
-5. **Smoke Test Admin Capabilities**:
-   - Log in as Admin: `admin` / `admin123`.
-   - View aggregated analytics charts and customer directory.
+1. **Make changes locally** in the IDE (e.g., UI adjustments, new features, bug fixes).
+2. **Commit and push** to the `main` branch:
+   ```bash
+   git add .
+   git commit -m "feat: your new feature or improvement"
+   git push origin main
+   ```
+3. **What happens automatically**:
+   - **GitHub Actions** runs unit and integration tests across backend and frontend.
+   - **Vercel** detects the push and triggers an automated frontend build & deployment (~20 seconds).
+   - **Render** detects the push and triggers a Docker rebuild & rolling deployment (~2 minutes).
+   - If database migrations were added (`V3__...`), Flyway automatically applies them to your cloud database upon backend restart.
+   - **Zero manual intervention required!** Your live website updates seamlessly.
 
 ---
 
-## 🛡️ Production Security Checklist
+## 🧪 Step 5: Production Smoke Test Checklist
 
-- [ ] Changed default demo passwords in production.
-- [ ] Enforced HTTPS across all endpoints (enforced by Render/Vercel).
-- [ ] Set `ALLOWED_ORIGINS` to strictly match the production frontend domain (no wildcards).
-- [ ] Stored `JWT_SECRET` in cloud secrets manager or encrypted environment variables.
-- [ ] Database credentials rotated and restricted by IP where applicable.
+Once live:
+
+1. **Actuator Health Check**:
+   - Open: `https://<backend-url>/actuator/health`
+   - Status should be `{"status":"UP"}`.
+2. **Interactive Swagger API Documentation**:
+   - Open: `https://<backend-url>/swagger-ui/index.html`
+3. **Customer Login & Operations**:
+   - Open your Vercel frontend URL.
+   - Log in: `cust1` / `cust123` (or `johndoe` / `customer123`).
+   - Confirm balance and recent transactions appear.
+   - Transfer ₹50 to account `1001001002` (`cust2`).
+   - Download the branded PDF statement.
+4. **Staff Approval Portal**:
+   - Log in: `staff1` / `staff123` (or `staff` / `staff123`).
+   - Check pending loan requests and approve or reject.
+5. **Admin Analytics Dashboard**:
+   - Log in: `admin` / `admin123`.
+   - Verify aggregate charts and manage customer/staff accounts.
