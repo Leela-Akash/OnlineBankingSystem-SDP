@@ -1,0 +1,66 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  backend-build-and-test:
+    name: Backend Build & Test (Java 21 / Spring Boot 3.5.6)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Grant Execute Permission for Maven Wrapper
+        run: chmod +x BACKEND/onlinebanking-backend/mvnw
+
+      - name: Build and Run Backend Tests with JaCoCo Coverage
+        working-directory: BACKEND/onlinebanking-backend
+        env:
+          JWT_SECRET: c2VjdXJlQmFua2luZ1N5c3RlbVNlY3JldEtleUZvckpXVFRva2VuR2VuZXJhdGlvbjEyMzQ1Ng==
+          ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000
+        run: ./mvnw clean test jacoco:report
+
+      - name: Upload JaCoCo Coverage Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-coverage-report
+          path: BACKEND/onlinebanking-backend/target/site/jacoco/
+          retention-days: 14
+
+  frontend-build:
+    name: Frontend Build & Lint (React 19 / Vite)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: FRONTEND/onlinebanking-frontend/package-lock.json
+
+      - name: Install Frontend Dependencies
+        working-directory: FRONTEND/onlinebanking-frontend
+        run: npm ci
+
+      - name: Build Frontend Production Bundle
+        working-directory: FRONTEND/onlinebanking-frontend
+        env:
+          VITE_API_URL: http://localhost:8080
+        run: npm run build

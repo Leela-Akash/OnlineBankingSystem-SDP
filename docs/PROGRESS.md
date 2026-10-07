@@ -33,11 +33,11 @@
 - [x] Build and test verification, git commit: `phase-3: database and config`.
 
 ## Phase 4: Testing and CI
-- [ ] Service layer unit tests (transfers, loans, validations, limits, balance checks).
-- [ ] Integration tests covering auth flow, role-based 403 checks, transfer success, rollback, and concurrency tests (ExecutorService overdraw prevention).
-- [ ] 70%+ service layer test coverage with JaCoCo report plugin.
-- [ ] GitHub Actions CI workflow building and testing backend and building frontend on every push.
-- [ ] Build and test verification, git commit: `phase-4: testing and ci`.
+- [x] Service layer unit tests (transfers, loans, validations, limits, balance checks).
+- [x] Integration tests covering auth flow, role-based 403 checks, transfer success, rollback, and concurrency tests (ExecutorService overdraw prevention).
+- [x] 70%+ service layer test coverage with JaCoCo report plugin.
+- [x] GitHub Actions CI workflow building and testing backend and building frontend on every push.
+- [x] Build and test verification, git commit: `phase-4: testing and ci`.
 
 ## Phase 5: API Quality
 - [ ] Springdoc OpenAPI / Swagger UI with JWT Bearer auth integration and endpoint documentation.
