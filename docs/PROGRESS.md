@@ -63,10 +63,10 @@
 - [x] Build and test verification, git commit: `phase-7: repo and docs`.
 
 ## Phase 8: Deployment Readiness
-- [ ] Cloud deployment readiness for backend (Render/Railway Dockerfile reading env vars).
-- [ ] Vercel deployment readiness for frontend (`vercel.json` rewrites for SPA routing, `VITE_API_URL`).
-- [ ] Step-by-step deployment guide in `docs/DEPLOY.md`.
-- [ ] Build and test verification, git commit: `phase-8: deployment readiness`.
+- [x] Cloud deployment readiness for backend (Render/Railway Dockerfile reading env vars).
+- [x] Vercel deployment readiness for frontend (`vercel.json` rewrites for SPA routing, `VITE_API_URL`).
+- [x] Step-by-step deployment guide in `docs/DEPLOY.md`.
+- [x] Build and test verification, git commit: `phase-8: deployment readiness`.
 
 ## Final Verification
 - [ ] Full backend build and tests pass.

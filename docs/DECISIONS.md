@@ -53,3 +53,18 @@ This document records the architectural and engineering decisions made during th
 - **Centralized Routing & Protected Routes:** Refactored React Router structure into clean nested layouts using `<Outlet />`, `ProtectedRoute` with role enforcement, and centralized error handling.
 - **JWT Interceptor & Session Management:** Centralized all HTTP traffic through `apiClient` with automatic token attachment and 401 token refresh/logout handling.
 - **Fintech Dashboard Experience:** Upgraded UI aesthetics with responsive layouts, transaction filtering, dark mode support, real-time feedback, and statement generation.
+
+---
+
+## 7. Repository Cleanliness & Documentation (Phase 7)
+- **Git Index Sanitization:** Removed tracked Eclipse IDE workspace metadata (`BACKEND/.metadata`) from git index.
+- **Unified .gitignore:** Added comprehensive multi-environment ignoring covering Java, Maven target, Node modules, Vite build outputs, IDE configs, OS files, and secret `.env` files while allowing `.env.example`.
+- **Comprehensive README:** Overhauled documentation with full architecture Mermaid diagram, financial correctness breakdown, quickstart guide, demo credentials table, and engineering learnings.
+
+---
+
+## 8. Deployment Readiness (Phase 8)
+- **Container Port & Env Dynamism:** Ensured the backend Dockerfile and properties configure dynamically via `PORT`, `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, and `ALLOWED_ORIGINS` for platforms like Render and Railway.
+- **SPA Routing Configuration:** Added `vercel.json` and Netlify `_redirects` to route all dynamic routes back to `/index.html` preventing HTTP 404 on hard refreshes.
+- **Deployment Playbook:** Created `docs/DEPLOY.md` detailing step-by-step instructions for managed MySQL provisioning, backend container hosting, frontend CDN deployment, and post-deployment smoke testing.
+
