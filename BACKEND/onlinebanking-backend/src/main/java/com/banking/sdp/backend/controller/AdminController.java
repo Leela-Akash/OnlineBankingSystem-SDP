@@ -67,10 +67,31 @@ public class AdminController {
         }
     }
 
+    @Autowired
+    private com.banking.sdp.backend.repository.CustomerRepository customerRepository;
+
+    @Autowired
+    private com.banking.sdp.backend.service.AuditLogService auditLogService;
+
     @GetMapping("/customers")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<Customer>> getAllCustomers() {
+    public ResponseEntity<?> getAllCustomers(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String search) {
+        if (page != null && size != null) {
+            org.springframework.data.domain.Pageable pageable = 
+                    org.springframework.data.domain.PageRequest.of(page, size, org.springframework.data.domain.Sort.by("id").descending());
+            return ResponseEntity.ok(customerRepository.searchCustomers(search, status, pageable));
+        }
         return ResponseEntity.ok(adminService.viewAllCustomers());
+    }
+
+    @GetMapping("/audit-logs")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getAuditLogs() {
+        return ResponseEntity.ok(auditLogService.getRecentLogs());
     }
 
     @GetMapping("/staff")

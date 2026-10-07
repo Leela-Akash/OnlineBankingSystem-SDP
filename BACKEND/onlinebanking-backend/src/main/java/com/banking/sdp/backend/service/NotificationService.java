@@ -19,6 +19,10 @@ public class NotificationService {
         Notification notification = new Notification(customer, title, message, type);
         notificationRepository.save(notification);
     }
+
+    public void createTransactionNotification(Customer customer, String title, String message) {
+        createNotification(customer, title, message, "transaction");
+    }
     
     public List<Notification> getNotificationsByCustomer(Long customerId, Customer customer) {
         return notificationRepository.findByCustomerOrderByCreatedAtDesc(customer);

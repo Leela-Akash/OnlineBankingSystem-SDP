@@ -4,10 +4,15 @@ import com.banking.sdp.backend.dto.DepositWithdrawRequest;
 import com.banking.sdp.backend.dto.TransferRequest;
 import com.banking.sdp.backend.model.Customer;
 import com.banking.sdp.backend.model.Transaction;
+import com.banking.sdp.backend.repository.TransactionRepository;
 import com.banking.sdp.backend.service.CustomerService;
 import com.banking.sdp.backend.service.TransactionService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +33,9 @@ public class TransactionController {
     @Autowired
     private CustomerService customerService;
 
+    @Autowired
+    private TransactionRepository transactionRepository;
+
     // Add transaction (Deposit / Withdraw)
     @PostMapping("/add/{customerId}")
     @PreAuthorize("@securityService.isCustomerOwner(#customerId)")
@@ -41,12 +49,12 @@ public class TransactionController {
         }
 
         if (request.getAmount() == null || request.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Transaction amount must be greater than 0"));
+            return ResponseEntity.badRequest().body(Map.of("error", "Transaction amount must be strictly greater than 0"));
         }
 
         Transaction transaction = new Transaction();
         transaction.setCustomer(customer);
-        transaction.setAmount(request.getAmount().doubleValue());
+        transaction.setAmount(request.getAmount());
         transaction.setType(request.getType());
         transaction.setDescription(request.getDescription());
         transaction.setTransactionDate(LocalDateTime.now());
@@ -55,14 +63,24 @@ public class TransactionController {
         return ResponseEntity.ok(saved);
     }
 
-    // Get transactions of a customer
+    // Get transactions of a customer with optional pagination
     @GetMapping("/customer/{customerId}")
     @PreAuthorize("@securityService.isCustomerOwner(#customerId)")
-    public ResponseEntity<?> getCustomerTransactions(@PathVariable Long customerId) {
+    public ResponseEntity<?> getCustomerTransactions(
+            @PathVariable Long customerId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+
         Customer customer = customerService.getCustomerById(customerId);
         if (customer == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Customer not found"));
         }
+
+        if (page != null && size != null) {
+            Pageable pageable = PageRequest.of(page, size, Sort.by("transactionDate").descending());
+            return ResponseEntity.ok(transactionRepository.findByCustomerOrderByTransactionDateDesc(customer, pageable));
+        }
+
         List<Transaction> list = transactionService.getTransactionsByCustomer(customer);
         return ResponseEntity.ok(list);
     }
@@ -108,10 +126,20 @@ public class TransactionController {
         }
     }
 
-    // Staff/Admin: Get all transactions
+    // Staff/Admin: Get all transactions with pagination and filtering
     @GetMapping("/all")
     @PreAuthorize("hasAnyRole('STAFF', 'ADMIN')")
-    public ResponseEntity<List<Transaction>> getAllTransactions() {
+    public ResponseEntity<?> getAllTransactions(
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String search) {
+
+        if (page != null && size != null) {
+            Pageable pageable = PageRequest.of(page, size, Sort.by("transactionDate").descending());
+            return ResponseEntity.ok(transactionRepository.filterTransactions(type, search, pageable));
+        }
+
         List<Transaction> allTxns = transactionService.getAllTransactions();
         return ResponseEntity.ok(allTxns);
     }
@@ -123,7 +151,8 @@ public class TransactionController {
             @RequestParam(required = false) Long fromCustomerId,
             @RequestParam(required = false) Long toCustomerId,
             @RequestParam(required = false) Double amount,
-            @RequestBody(required = false) TransferRequest body) {
+            @RequestBody(required = false) TransferRequest body,
+            HttpServletRequest httpRequest) {
         try {
             Long senderId = (body != null && body.getFromCustomerId() != null) ? body.getFromCustomerId() : fromCustomerId;
             Long receiverId = (body != null && body.getToCustomerId() != null) ? body.getToCustomerId() : toCustomerId;
@@ -133,7 +162,11 @@ public class TransactionController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Valid sender ID, receiver ID, and positive amount are required"));
             }
 
-            String result = transactionService.transferFunds(senderId, receiverId, transferAmount);
+            String idempotencyKey = (body != null && body.getIdempotencyKey() != null)
+                    ? body.getIdempotencyKey() : httpRequest.getHeader("Idempotency-Key");
+
+            String result = transactionService.transferFunds(
+                    senderId, receiverId, BigDecimal.valueOf(transferAmount), idempotencyKey);
             return ResponseEntity.ok(Map.of("message", result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
@@ -149,7 +182,8 @@ public class TransactionController {
             @RequestParam(required = false) Long fromCustomerId,
             @RequestParam(required = false) String toAccountNumber,
             @RequestParam(required = false) Double amount,
-            @RequestBody(required = false) TransferRequest body) {
+            @RequestBody(required = false) TransferRequest body,
+            HttpServletRequest httpRequest) {
         try {
             Long senderId = (body != null && body.getFromCustomerId() != null) ? body.getFromCustomerId() : fromCustomerId;
             String receiverAcc = (body != null && body.getToAccountNumber() != null) ? body.getToAccountNumber() : toAccountNumber;
@@ -159,7 +193,11 @@ public class TransactionController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Valid sender ID, receiver account number, and positive amount are required"));
             }
 
-            String result = transactionService.transferFundsByAccountNumber(senderId, receiverAcc, transferAmount);
+            String idempotencyKey = (body != null && body.getIdempotencyKey() != null)
+                    ? body.getIdempotencyKey() : httpRequest.getHeader("Idempotency-Key");
+
+            String result = transactionService.transferFundsByAccountNumber(
+                    senderId, receiverAcc, BigDecimal.valueOf(transferAmount), idempotencyKey);
             return ResponseEntity.ok(Map.of("message", result));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));

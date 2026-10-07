@@ -12,17 +12,17 @@
 - [x] Build and test verification, git commit: `phase-1: security hardening`.
 
 ## Phase 2: Financial Correctness
-- [ ] Single source of truth account balance column (or proper Account entity), remove disconnected accountBalance and block it from profile updates.
-- [ ] `@Transactional(rollbackFor = Exception.class)` on fund transfers, deposits, withdrawals, and loan disbursements.
-- [ ] Pessimistic locking (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) with consistent lock order (e.g. by account ID) to eliminate race conditions and deadlocks.
-- [ ] Strict validation: amount > 0 and sufficient balance checks on every withdrawal, transfer, and transaction add endpoint.
-- [ ] Idempotency key on transfer endpoints and unique transaction reference numbers (UUID / structured).
-- [ ] Migrate monetary amounts to `BigDecimal` (eliminating `Double` precision issues) with configurable daily/per-transfer limits.
-- [ ] Customer soft delete (status = INACTIVE) instead of hard delete.
-- [ ] Replace `findAll().stream()` reports with SQL/JPQL aggregations (`COUNT`, `SUM`, `GROUP BY`) handling divide-by-zero and nulls gracefully.
-- [ ] Pagination and filtering for transaction and customer list endpoints.
-- [ ] Audit log table tracking user actions (login, transfer, loan approval, etc.) with timestamp and actor details.
-- [ ] Build and test verification, git commit: `phase-2: financial correctness`.
+- [x] Single source of truth account balance column (or proper Account entity), remove disconnected accountBalance and block it from profile updates.
+- [x] `@Transactional(rollbackFor = Exception.class)` on fund transfers, deposits, withdrawals, and loan disbursements.
+- [x] Pessimistic locking (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) with consistent lock order (e.g. by account ID) to eliminate race conditions and deadlocks.
+- [x] Strict validation: amount > 0 and sufficient balance checks on every withdrawal, transfer, and transaction add endpoint.
+- [x] Idempotency key on transfer endpoints and unique transaction reference numbers (UUID / structured).
+- [x] Migrate monetary amounts to `BigDecimal` (eliminating `Double` precision issues) with configurable daily/per-transfer limits.
+- [x] Customer soft delete (status = INACTIVE) instead of hard delete.
+- [x] Replace `findAll().stream()` reports with SQL/JPQL aggregations (`COUNT`, `SUM`, `GROUP BY`) handling divide-by-zero and nulls gracefully.
+- [x] Pagination and filtering for transaction and customer list endpoints.
+- [x] Audit log table tracking user actions (login, transfer, loan approval, etc.) with timestamp and actor details.
+- [x] Build and test verification, git commit: `phase-2: financial correctness`.
 
 ## Phase 3: Database and Config
 - [ ] Flyway migrations for full schema + demo seed data (1 admin, 1 staff, 3 customers with sample transactions and loans).
