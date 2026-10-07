@@ -42,6 +42,9 @@ public class TransactionController {
     @Autowired
     private TransactionRepository transactionRepository;
 
+    @Autowired
+    private com.banking.sdp.backend.security.SecurityService securityService;
+
     @Operation(summary = "Add deposit or withdrawal transaction", description = "Directly records a credit or debit operation on customer balance")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Transaction recorded"),
@@ -167,8 +170,8 @@ public class TransactionController {
             @ApiResponse(responseCode = "400", description = "Insufficient funds, limit exceeded, or invalid IDs"),
             @ApiResponse(responseCode = "403", description = "Unauthorized sender transfer")
     })
-    @PostMapping("/transfer")
-    @PreAuthorize("@securityService.isCustomerOwner(#fromCustomerId)")
+    @PostMapping({"/transfer", "/transferFunds"})
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> transferFunds(
             @RequestParam(required = false) Long fromCustomerId,
             @RequestParam(required = false) Long toCustomerId,
@@ -177,11 +180,27 @@ public class TransactionController {
             HttpServletRequest httpRequest) {
         try {
             Long senderId = (body != null && body.getFromCustomerId() != null) ? body.getFromCustomerId() : fromCustomerId;
+            if (senderId == null && body != null && body.getFromAccountNumber() != null && !body.getFromAccountNumber().isBlank()) {
+                Customer c = customerService.getCustomerByAccountNumber(body.getFromAccountNumber());
+                if (c != null) senderId = c.getId();
+            }
+            if (senderId == null) {
+                senderId = securityService.getCurrentUserId();
+            }
+
+            if (senderId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Sender customer ID or account number is required"));
+            }
+
+            if (!securityService.isCustomerOwner(senderId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Unauthorized: you may only transfer funds from your own account"));
+            }
+
             Long receiverId = (body != null && body.getToCustomerId() != null) ? body.getToCustomerId() : toCustomerId;
             Double transferAmount = (body != null && body.getAmount() != null) ? body.getAmount().doubleValue() : amount;
 
-            if (senderId == null || receiverId == null || transferAmount == null || transferAmount <= 0) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Valid sender ID, receiver ID, and positive amount are required"));
+            if (receiverId == null || transferAmount == null || transferAmount <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Valid receiver ID and positive amount are required"));
             }
 
             String idempotencyKey = (body != null && body.getIdempotencyKey() != null)
@@ -203,8 +222,8 @@ public class TransactionController {
             @ApiResponse(responseCode = "400", description = "Insufficient funds, recipient account not found, or limit exceeded"),
             @ApiResponse(responseCode = "403", description = "Unauthorized sender transfer")
     })
-    @PostMapping("/transfer/by-account")
-    @PreAuthorize("@securityService.isCustomerOwner(#fromCustomerId)")
+    @PostMapping({"/transfer/by-account", "/transfer-by-account", "/transferFundsByAccount"})
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> transferFundsByAccount(
             @RequestParam(required = false) Long fromCustomerId,
             @RequestParam(required = false) String toAccountNumber,
@@ -213,11 +232,27 @@ public class TransactionController {
             HttpServletRequest httpRequest) {
         try {
             Long senderId = (body != null && body.getFromCustomerId() != null) ? body.getFromCustomerId() : fromCustomerId;
+            if (senderId == null && body != null && body.getFromAccountNumber() != null && !body.getFromAccountNumber().isBlank()) {
+                Customer c = customerService.getCustomerByAccountNumber(body.getFromAccountNumber());
+                if (c != null) senderId = c.getId();
+            }
+            if (senderId == null) {
+                senderId = securityService.getCurrentUserId();
+            }
+
+            if (senderId == null) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Sender customer ID or account number is required"));
+            }
+
+            if (!securityService.isCustomerOwner(senderId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Unauthorized: you may only transfer funds from your own account"));
+            }
+
             String receiverAcc = (body != null && body.getToAccountNumber() != null) ? body.getToAccountNumber() : toAccountNumber;
             Double transferAmount = (body != null && body.getAmount() != null) ? body.getAmount().doubleValue() : amount;
 
-            if (senderId == null || receiverAcc == null || receiverAcc.isBlank() || transferAmount == null || transferAmount <= 0) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Valid sender ID, receiver account number, and positive amount are required"));
+            if (receiverAcc == null || receiverAcc.isBlank() || transferAmount == null || transferAmount <= 0) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Valid receiver account number and positive amount are required"));
             }
 
             String idempotencyKey = (body != null && body.getIdempotencyKey() != null)

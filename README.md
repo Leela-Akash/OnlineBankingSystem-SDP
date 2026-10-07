@@ -168,10 +168,10 @@ The database is automatically pre-seeded by Flyway (`V2__seed_demo_data.sql`):
 | Role | Username | Password | Notes |
 | :--- | :--- | :--- | :--- |
 | **Admin** | `admin` | `admin123` | Full administrative control, reports, staff & customer management |
-| **Staff** | `staff1` | `staff123` | Credit underwriting, loan approval, customer ledger viewing |
-| **Customer** | `cust1` | `cust123` | Account `1001001001`, initial balance $5,000.00 |
-| **Customer** | `cust2` | `cust123` | Account `1001001002`, initial balance $3,250.00 |
-| **Customer** | `cust3` | `cust123` | Account `1001001003`, initial balance $1,500.00 |
+| **Staff** | `staff` | `staff123` | Credit underwriting, loan approval, customer ledger viewing |
+| **Customer** | `johndoe` | `customer123` | Account `100000000001`, initial balance $25,000.00 |
+| **Customer** | `janesmith` | `customer123` | Account `100000000002`, initial balance $15,000.00 |
+| **Customer** | `robertb` | `customer123` | Account `100000000003`, initial balance $50,000.00 |
 
 ---
 

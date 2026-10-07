@@ -6,8 +6,9 @@ import java.math.BigDecimal;
 
 public class TransferRequest {
 
-    @NotNull(message = "Sender customer ID is required")
     private Long fromCustomerId;
+
+    private String fromAccountNumber;
 
     private Long toCustomerId;
 
@@ -23,6 +24,9 @@ public class TransferRequest {
 
     public Long getFromCustomerId() { return fromCustomerId; }
     public void setFromCustomerId(Long fromCustomerId) { this.fromCustomerId = fromCustomerId; }
+
+    public String getFromAccountNumber() { return fromAccountNumber; }
+    public void setFromAccountNumber(String fromAccountNumber) { this.fromAccountNumber = fromAccountNumber; }
 
     public Long getToCustomerId() { return toCustomerId; }
     public void setToCustomerId(Long toCustomerId) { this.toCustomerId = toCustomerId; }
