@@ -11,11 +11,11 @@
 
 ---
 
-## 🌐 Live Demo & Preview
-
-- **Live Application**: [https://nexus-banking.example.com](https://nexus-banking.example.com) *(Demo placeholder)*
-- **Interactive API Documentation (Swagger)**: `http://localhost:8080/swagger-ui/index.html`
-- **Actuator Health & Metrics**: `http://localhost:8080/actuator/health`
+## 🌐 Live Deployment
+- **Live Application (Frontend)**: [https://online-banking-system-sdp.vercel.app](https://online-banking-system-sdp.vercel.app)
+- **Live Backend API**: [https://nexus-banking-backend.onrender.com](https://nexus-banking-backend.onrender.com)
+- **Interactive API Documentation (Swagger UI)**: [https://nexus-banking-backend.onrender.com/swagger-ui/index.html](https://nexus-banking-backend.onrender.com/swagger-ui/index.html)
+- **Actuator Health & Metrics**: [https://nexus-banking-backend.onrender.com/actuator/health](https://nexus-banking-backend.onrender.com/actuator/health)
 
 ### 📸 Application Previews
 *(Place dashboard screenshots here: Customer Analytics, Transfer Flow, Staff Loan Approval, Admin System Health)*
